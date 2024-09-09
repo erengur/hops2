@@ -1,0 +1,81 @@
+.makine-tanımlama-container {
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .add-machine-form {
+    margin-bottom: 20px;
+  }
+  
+  .add-machine-form input {
+    display: block;
+    margin: 10px 0;
+    padding: 10px;
+    width: 100%;
+    max-width: 400px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+  }
+  
+  .add-machine-form button {
+    padding: 10px 20px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .add-machine-form button:hover {
+    background-color: #218838;
+  }
+  
+  .success-message {
+    color: #28a745;
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+  
+  .error-message {
+    color: #dc3545;
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+  
+  .machine-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .machine-table th,
+  .machine-table td {
+    padding: 10px;
+    border: 1px solid #ddd;
+  }
+  
+  .machine-table th {
+    background-color: #007bff;
+    color: white;
+  }
+  
+  .machine-table td {
+    text-align: left;
+  }
+  
+  .machine-table button {
+    padding: 5px 10px;
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .machine-table button:hover {
+    background-color: #c82333;
+  }
+  

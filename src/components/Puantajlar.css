@@ -1,0 +1,461 @@
+/* Puantajlar container */
+.puantajlar-container {
+  max-width: 100%;
+  margin: 20px auto;
+  padding: 20px;
+  background-color: var(--bg-color);
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  color: var(--text-color);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+/* Tarih Filtresi */
+.date-filter {
+  
+  display: flex;
+  align-items: flex-start;
+ /* gap: 20px;*/
+  justify-content: flex-start;
+}
+
+.date-filter label {
+  color: white;
+    background: #007bff;
+  max-width: 150px;
+  display: block; /* Eğer tek satırda durmasını istiyorsanız block olarak ayarlayın */
+  font-size: 14px; /* Yazı boyutunu ayarlayabilirsiniz */
+  margin-bottom: 5px; /* Boşluk eklemek için */
+}
+/* Tarih seçim kutuları için stil */
+.react-datepicker__input-container {
+  max-width: 150px;
+  /*margin-right: 10px; /* Kutuların arasına boşluk eklemek için */
+}
+
+
+
+/* Bitiş Tarihi kutusu için */
+.bitis-tarihi {
+  max-width: 150px;
+  /*margin-right: 10px;*/
+}
+
+/* Toplam saat hesaplama alanı */
+.total-hours {
+  align-items: flex-start;
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.total-hours button {
+  padding: 8px 12px;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.total-hours button:hover {
+  background-color: #b52a38;
+}
+
+.total-hours p {
+  background-color: #f0f0f0;
+  color: #333;
+  padding: 8px;
+  border-radius: 5px;
+  font-size: 14px;
+  margin: 0;
+  
+  text-align: center;
+  box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.1);
+}
+
+.puantajlar-container h2 {
+  text-align: center;
+  margin-bottom: 20px;
+  font-size: 24px;
+}
+
+/* Buton Grubu */
+.button-group {
+  display: flex;
+  justify-content: space-between;
+  gap: 5px;
+  margin-bottom: 10px;
+  max-width: 250px; /* Butonların genişliği 'Seç' ve 'Sözleşme Numarası' arasına sığacak şekilde ayarlanmış */
+  align-items: center;
+}
+
+.button-group button {
+  padding: 3px 6px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.button-group button:hover {
+  background-color: #415d7a;
+}
+.total-hours button {
+  max-width: 150px;
+  padding: 8px 12px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  font-size: 14px;
+  cursor: pointer;
+}
+/* Toplam Saat Hesaplama Butonu ve Saat Çıktısı */
+.total-hours {
+  display: flex;
+  justify-content: flex-start;
+  gap: 5px;
+  margin-bottom: 10px;
+  max-width: 400px;
+  align-items: flex-start;
+}
+
+.total-hours button {
+  padding: 8px 12px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.total-hours button:hover {
+  background-color: #28a745;
+}
+
+.total-hours p {
+  background-color: #007bff;
+  color: white;
+  padding: 8px;
+  border-radius: 3px;
+  font-size: 14px;
+  margin: 0;
+}
+
+/* Seçili PDF'leri İndir Butonu */
+.download-button-inline {
+  padding: 3px 6px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.download-button-inline:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.download-button-inline:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+/* Puantajlar Table */
+.puantajlar-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.puantajlar-table th,
+.puantajlar-table td {
+  border: 1px solid var(--border-color);
+  padding: 10px;
+  text-align: left;
+}
+
+.puantajlar-table th {
+  background-color: var(--table-header-bg);
+  font-weight: bold;
+}
+
+.puantajlar-table tr:nth-child(even) {
+  background-color: var(--table-row-bg);
+}
+
+.puantajlar-table tr:hover {
+  background-color: var(--table-row-hover-bg);
+}
+
+/* Tik Kutuları (Checkbox) */
+input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  -webkit-appearance: none; /* Tarayıcı varsayılan görünümünü kaldırıyoruz */
+  appearance: none;
+  background-color: #fff;
+  border: 2px solid var(--border-color);
+  border-radius: 4px;
+  display: inline-block;
+  position: relative;
+}
+
+input[type="checkbox"]:checked {
+  background-color: #007bff;
+  border-color: #007bff;
+}
+
+input[type="checkbox"]:checked::before {
+  content: '✓';
+  position: absolute;
+  top: 0;
+  left: 3px;
+  font-size: 16px;
+  color: white;
+}
+
+/* Link Button (PDF Sözleşme Numarası) */
+.link-button {
+  background: none;
+  border: none;
+  color: #007bff; /* Tema rengine uyumlu */
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0;
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+.link-button:hover {
+  color: var(--button-color);
+  background: none;
+  border: none;
+}
+
+/* PDF Popup */
+.pdf-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+}
+
+.pdf-popup iframe {
+  border: none;
+}
+
+.pdf-popup button {
+  margin-top: 10px;
+  padding: 5px 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.pdf-popup button:hover {
+  background-color: #0056b3;
+}
+.customer-filter {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 5px;
+  margin-bottom: 10px;
+  max-width: 400px;
+  
+}
+
+.customer-filter label {
+  color: white;
+    background: #007bff;
+  max-width: 150px;
+  display: block; /* Eğer tek satırda durmasını istiyorsanız block olarak ayarlayın */
+  font-size: 14px; /* Yazı boyutunu ayarlayabilirsiniz */
+  margin-bottom: 5px; /* Boşluk eklemek için */
+}
+
+
+
+.light .customer-filter select {
+  background-color: #fff; /* Light modda beyaz arka plan */
+  color: #000; /* Light modda siyah yazılar */
+  border: 1px solid #ccc; /* Light modda gri kenar */
+  padding: 5px;
+  border-radius: 4px;
+  max-width: 250px;
+}
+
+
+
+.dark .customer-filter select {
+  background-color: #333; /* Dark modda koyu gri arka plan */
+  color: #fff; /* Dark modda beyaz yazılar */
+  border: 1px solid #555; /* Dark modda koyu kenar */
+  padding: 5px;
+  border-radius: 4px;
+  max-width: 250px;
+}
+
+/* Genel Stil */
+.customer-filter select {
+  width: 100%; /* Select elemanı genişliği */
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  outline: none;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.customer-filter select:focus {
+  border-color: #007bff; /* Focus olduğunda mavi kenarlık */
+}
+/* Makine Filtresi */
+.machine-filter {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 5px;
+  margin-bottom: 10px;
+  max-width: 400px;
+}
+
+.machine-filter label {
+  color: white;
+  background: #007bff;
+  max-width: 150px;
+  display: block;
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+
+.light .machine-filter select {
+  background-color: #fff; /* Light modda beyaz arka plan */
+  color: #000; /* Light modda siyah yazılar */
+  border: 1px solid #ccc; /* Light modda gri kenar */
+  padding: 5px;
+  border-radius: 4px;
+  max-width: 250px;
+}
+
+.dark .machine-filter select {
+  background-color: #333; /* Dark modda koyu gri arka plan */
+  color: #fff; /* Dark modda beyaz yazılar */
+  border: 1px solid #555; /* Dark modda koyu kenar */
+  padding: 5px;
+  border-radius: 4px;
+  max-width: 250px;
+}
+
+/* Genel Stil */
+.machine-filter select {
+  width: 100%; /* Select elemanı genişliği */
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  outline: none;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.machine-filter select:focus {
+  border-color: #007bff; /* Focus olduğunda mavi kenarlık */
+}
+/* Hakediş hesaplama alanı */
+.hakedis-calculate {
+  align-items: flex-start;
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+  margin-bottom: 15px;
+  max-width: 400px;
+}
+
+.hakedis-calculate button {
+  padding: 8px 12px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  font-size: 14px;
+  cursor: pointer;
+  max-width: 150px;
+}
+
+.hakedis-calculate button:hover {
+  background-color: #28a745;
+}
+
+.hakedis-calculate p {
+  background-color: #007bff;
+  color: white;
+  padding: 8px;
+  border-radius: 3px;
+  font-size: 14px;
+  margin: 0;
+  text-align: center;
+  box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.1);
+}
+/* Operatör Adı Filtresi */
+.operator-filter {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 5px;
+  margin-bottom: 10px;
+  max-width: 400px;
+}
+
+.operator-filter label {
+  color: white;
+  background: #007bff;
+  max-width: 150px;
+  display: block;
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+
+.light .operator-filter select {
+  background-color: #fff; /* Light mode white background */
+  color: #000; /* Light mode black text */
+  border: 1px solid #ccc; /* Light mode gray border */
+  padding: 5px;
+  border-radius: 4px;
+  max-width: 250px;
+}
+
+.dark .operator-filter select {
+  background-color: #333; /* Dark mode dark gray background */
+  color: #fff; /* Dark mode white text */
+  border: 1px solid #555; /* Dark mode darker border */
+  padding: 5px;
+  border-radius: 4px;
+  max-width: 250px;
+}
+
+/* General Styling */
+.operator-filter select {
+  width: 100%; /* Full width */
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  outline: none;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.operator-filter select:focus {
+  border-color: #007bff; /* Blue border on focus */
+}

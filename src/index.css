@@ -1,13 +1,221 @@
-body {
+/* Genel Stiller */
+* {
+  box-sizing: border-box;
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  padding: 0;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #333;
+  line-height: 1.6;
+  margin: 0;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Light Tema (Varsayılan) */
+body.light-theme {
+  background-color: #f8f9fa; /* Açık gri arka plan */
+  color: #333; /* Metin rengi */
+}
+
+/* Dark Tema */
+body.dark-theme {
+  background-color: #2d2d2d; /* Koyu gri arka plan */
+  color: #f1f1f1; /* Açık metin rengi */
+}
+
+/* Topbar */
+.topbar {
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  height: 64px;
+  z-index: 100;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  transition: background-color 0.3s ease;
+}
+
+/* Light Tema için Topbar */
+body.light-theme .topbar {
+  background-color: #f1f3f5;
+  color: #333;
+}
+
+/* Dark Tema için Topbar */
+body.dark-theme .topbar {
+  background-color: #1a1a1a;
+  color: #f1f1f1;
+}
+
+/* Leftbar (sabit genişlikte) */
+.leftbar {
+  padding: 20px;
+  height: calc(100vh - 64px); /* Topbar'dan kalan alanı kaplar */
+  box-shadow: 4px 0 8px rgba(0, 0, 0, 0.1);
+  position: fixed;
+  top: 64px;
+  left: 0;
+  width: 240px;
+  z-index: 10;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Light Tema için Leftbar */
+body.light-theme .leftbar {
+  background-color: #343a40;
+  color: white;
+}
+
+/* Dark Tema için Leftbar */
+body.dark-theme .leftbar {
+  background-color: #1a1a1a;
+  color: #f1f1f1;
+}
+
+/* Leftbar'daki butonlar */
+.leftbar button {
+  background-color: transparent;
+  color: inherit;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  text-align: left;
+  padding: 10px 0;
+  transition: color 0.3s ease;
+  width: 100%;
+  display: block;
+  white-space: nowrap;
+  outline: none;
+}
+
+/* Leftbar'da butonlar hover durumunda */
+.leftbar button:hover {
+  color: #007bff; /* Mavi renk değişimi */
+}
+
+/* Buton odaklanma durumu */
+.leftbar button:focus {
+  outline: none;
+}
+
+/* İçerik Alanı */
+.content {
+  margin-left: 0px; /* Leftbar genişliği kadar yer bırak */
+  padding: 20px;
+  margin-top: 0px; /* Topbar'ın yüksekliği kadar üstten boşluk */
+  height: calc(100vh - 64px);
+  overflow-y: auto;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Light Tema İçerik Alanı */
+body.light-theme .content {
+  background-color: #ffffff;
+  color: #333;
+}
+
+/* Dark Tema İçerik Alanı */
+body.dark-theme .content {
+  background-color: #2d2d2d;
+  color: #f1f1f1;
+}
+
+/* Kullanıcı Ekle Formu */
+.container {
+  max-width: 600px;
+  margin: 50px auto;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Light Tema Form */
+body.light-theme .container {
+  background-color: #ffffff;
+  color: #333;
+}
+
+/* Dark Tema Form */
+body.dark-theme .container {
+  background-color: #444;
+  color: #f1f1f1;
+}
+
+/* Form Elemanları */
+input, label, button {
+  display: block; /* Form elemanlarını dikeyde sıraya dizer */
+  width: 100%; /* Input ve butonlar tam genişlikte */
+  padding: 10px;
+  margin-bottom: 15px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 16px;
+  background-color: #f9f9f9;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+  box-sizing: border-box; /* Padding ve border toplam genişlik içinde kalır */
+}
+
+/* Light Tema Input */
+body.light-theme input {
+  background-color: #f9f9f9;
+  color: #333;
+  border-color: #ccc;
+}
+
+/* Dark Tema Input */
+body.dark-theme input {
+  background-color: #555;
+  color: #f1f1f1;
+  border-color: #666;
+}
+
+input:focus {
+  border-color: #007bff;
+  outline: none;
+}
+
+/* Butonlar */
+button {
+  display: inline-flex;
+  justify-content: center; /* İçeriği ortala */
+  align-items: center;
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  background-color: #0056b3;
+}
+
+.list-disc {
+  padding-left: 20px;
+}
+
+li {
+  margin-bottom: 10px;
+}
+
+/* Medya Sorguları: Mobil cihazlar için */
+@media (max-width: 768px) {
+  .leftbar {
+    width: 200px; /* Mobil cihazlarda sol menü biraz daha dar */
+  }
+
+  .content {
+    margin-left: 200px;
+  }
 }
