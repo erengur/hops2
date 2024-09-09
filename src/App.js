@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { HashRouter as Router, Routes, Route } from 'react-router-dom'; // BrowserRouter yerine HashRouter kullanıyoruz
+import { HashRouter as Router, Routes, Route } from 'react-router-dom'; // HashRouter kullanıyoruz
 import Login from './components/Login';
 import Signup from './components/Signup';
 import Dashboard from './components/Dashboard';
@@ -19,7 +19,7 @@ function App() {
   };
 
   return (
-    <Router>
+    <Router basename="/hops2">
       <Routes>
         {/* Giriş ekranı */}
         <Route path="/" element={<Login setEmail={setUserEmail} onLogin={handleLogin} />} />
