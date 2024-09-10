@@ -277,7 +277,7 @@ const Puantajlar = () => {
 
   return (
     <div className="puantajlar-container">
-      <h2>Puantajlar</h2>
+      <h2>Puantajlar ------- Mücahit abi selamun aleyküm</h2>
 
       <div className="filter-container">
         {/* Tarih Filtresi */}

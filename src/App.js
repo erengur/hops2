@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { HashRouter as Router, Routes, Route } from 'react-router-dom'; // HashRouter kullanıyoruz
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'; // BrowserRouter kullanıyoruz
 import Login from './components/Login';
 import Signup from './components/Signup';
 import Dashboard from './components/Dashboard';
@@ -19,18 +19,14 @@ function App() {
   };
 
   return (
-    <Router basename="/hops2">
-      <Routes>
-        {/* Giriş ekranı */}
-        <Route path="/" element={<Login setEmail={setUserEmail} onLogin={handleLogin} />} />
+    <Router>
+  <Routes>
+    <Route path="/" element={<Login setEmail={setUserEmail} onLogin={handleLogin} />} />
+    <Route path="/signup" element={<Signup />} />
+    <Route path="/dashboard" element={<Dashboard onSignOut={handleLogout} userEmail={userEmail} />} />
+  </Routes>
+</Router>
 
-        {/* Kayıt ekranı */}
-        <Route path="/signup" element={<Signup />} />
-
-        {/* Dashboard ekranı - Giriş yapılmışsa göster */}
-        <Route path="/dashboard" element={<Dashboard onSignOut={handleLogout} userEmail={userEmail} />} />
-      </Routes>
-    </Router>
   );
 }
 
