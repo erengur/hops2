@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import './MakineTanımlama.css';
 
 const MakineTanımlama = () => {
@@ -9,6 +9,7 @@ const MakineTanımlama = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
+  const [editingMachine, setEditingMachine] = useState(null);
 
   useEffect(() => {
     fetchMachines();
@@ -35,7 +36,7 @@ const MakineTanımlama = () => {
   // Yeni makine ekleme
   const addMachine = async () => {
     if (!newMachineName || !newMachinePlate) {
-      setError('Lütfen makine adı ve plaka giriniz.');
+      setError('Lütfen makine kodu ve detay giriniz.');
       return;
     }
 
@@ -48,7 +49,7 @@ const MakineTanımlama = () => {
       setNewMachineName('');
       setNewMachinePlate('');
       setSuccessMessage('Yeni makine başarıyla eklendi.');
-      fetchMachines(); // Verileri yeniden yükle
+      fetchMachines();
     } catch (error) {
       setError('Makine eklenirken bir hata oluştu.');
     }
@@ -60,9 +61,40 @@ const MakineTanımlama = () => {
     try {
       await deleteDoc(doc(db, 'makineListesi', machineId));
       setSuccessMessage('Makine başarıyla silindi.');
-      fetchMachines(); // Verileri yeniden yükle
+      fetchMachines();
     } catch (error) {
       setError('Makine silinirken bir hata oluştu.');
+    }
+  };
+
+  // Makine düzenleme modunu aç
+  const startEditing = (machine) => {
+    setEditingMachine({ ...machine });
+  };
+
+  // Düzenleme iptal
+  const cancelEditing = () => {
+    setEditingMachine(null);
+  };
+
+  // Makine güncelleme
+  const updateMachine = async () => {
+    if (!editingMachine.MakineAdı || !editingMachine.MakinePlakası) {
+      setError('Lütfen makine kodu ve detay giriniz.');
+      return;
+    }
+
+    const db = getFirestore();
+    try {
+      await updateDoc(doc(db, 'makineListesi', editingMachine.id), {
+        MakineAdı: editingMachine.MakineAdı,
+        MakinePlakası: editingMachine.MakinePlakası,
+      });
+      setSuccessMessage('Makine başarıyla güncellendi.');
+      setEditingMachine(null);
+      fetchMachines();
+    } catch (error) {
+      setError('Makine güncellenirken bir hata oluştu.');
     }
   };
 
@@ -75,13 +107,13 @@ const MakineTanımlama = () => {
         <h3>Yeni Makine Ekle</h3>
         <input
           type="text"
-          placeholder="Makine Adı"
+          placeholder="Makine Kodu"
           value={newMachineName}
           onChange={(e) => setNewMachineName(e.target.value)}
         />
         <input
           type="text"
-          placeholder="Makine Plakası"
+          placeholder="Makine Detayı"
           value={newMachinePlate}
           onChange={(e) => setNewMachinePlate(e.target.value)}
         />
@@ -99,18 +131,58 @@ const MakineTanımlama = () => {
         <table className="machine-table">
           <thead>
             <tr>
-              <th>Makine Adı</th>
-              <th>Makine Plakası</th>
-              <th>Sil</th>
+              <th>Makine Kodu</th>
+              <th>Makine Detayı</th>
+              <th>İşlemler</th>
             </tr>
           </thead>
           <tbody>
             {machines.map((machine) => (
               <tr key={machine.id}>
-                <td>{machine.MakineAdı}</td>
-                <td>{machine.MakinePlakası}</td>
                 <td>
-                  <button onClick={() => deleteMachine(machine.id)}>Sil</button>
+                  {editingMachine && editingMachine.id === machine.id ? (
+                    <input
+                      type="text"
+                      value={editingMachine.MakineAdı}
+                      onChange={(e) =>
+                        setEditingMachine({
+                          ...editingMachine,
+                          MakineAdı: e.target.value,
+                        })
+                      }
+                    />
+                  ) : (
+                    machine.MakineAdı
+                  )}
+                </td>
+                <td>
+                  {editingMachine && editingMachine.id === machine.id ? (
+                    <input
+                      type="text"
+                      value={editingMachine.MakinePlakası}
+                      onChange={(e) =>
+                        setEditingMachine({
+                          ...editingMachine,
+                          MakinePlakası: e.target.value,
+                        })
+                      }
+                    />
+                  ) : (
+                    machine.MakinePlakası
+                  )}
+                </td>
+                <td>
+                  {editingMachine && editingMachine.id === machine.id ? (
+                    <>
+                      <button onClick={updateMachine}>Kaydet</button>
+                      <button onClick={cancelEditing}>İptal</button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => startEditing(machine)}>Düzenle</button>
+                      <button onClick={() => deleteMachine(machine.id)}>Sil</button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}

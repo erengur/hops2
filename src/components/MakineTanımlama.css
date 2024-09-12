@@ -78,4 +78,42 @@
   .machine-table button:hover {
     background-color: #c82333;
   }
+  .machine-table input[type="text"] {
+    width: 100%;
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
   
+  .machine-table button {
+    margin-right: 5px;
+  }
+  
+  .machine-table button:last-child {
+    margin-right: 0;
+  }
+  
+  .machine-table button.edit {
+    background-color: #ffc107;
+    color: black;
+  }
+  
+  .machine-table button.edit:hover {
+    background-color: #e0a800;
+  }
+  
+  .machine-table button.save {
+    background-color: #28a745;
+  }
+  
+  .machine-table button.save:hover {
+    background-color: #218838;
+  }
+  
+  .machine-table button.cancel {
+    background-color: #6c757d;
+  }
+  
+  .machine-table button.cancel:hover {
+    background-color: #5a6268;
+  }

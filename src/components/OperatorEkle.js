@@ -5,47 +5,42 @@ import './OperatorEkle.css';
 const OperatorEkle = () => {
   const [name, setName] = useState('');
   const [surname, setSurname] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [operators, setOperators] = useState([]);
-  const [isEditing, setIsEditing] = useState(false); // To track if we're editing an operator
-  const [editOperatorId, setEditOperatorId] = useState(null); // To store the ID of the operator being edited
+  const [isEditing, setIsEditing] = useState(false);
+  const [editOperatorId, setEditOperatorId] = useState(null);
 
   const db = getFirestore();
 
   useEffect(() => {
-    fetchOperators();
-  }, []);
+    const fetchOperators = async () => {
+      const operatorsCollection = collection(db, 'operatorListesi');
+      const operatorSnapshot = await getDocs(operatorsCollection);
+      const operatorList = operatorSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setOperators(operatorList);
+    };
 
-  const fetchOperators = async () => {
-    const operatorsCollection = collection(db, 'operatorListesi');
-    const operatorSnapshot = await getDocs(operatorsCollection);
-    const operatorList = operatorSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    setOperators(operatorList);
-  };
+    fetchOperators();
+  }, [db]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const newOperator = { name, surname, phoneNumber, password };
+    const newOperator = { name, surname, password };
 
     try {
       if (isEditing) {
-        // Update existing operator
         const docRef = doc(db, 'operatorListesi', editOperatorId);
         await updateDoc(docRef, newOperator);
         setOperators(operators.map(op => (op.id === editOperatorId ? { ...op, ...newOperator } : op)));
         setIsEditing(false);
         setEditOperatorId(null);
       } else {
-        // Add new operator
         const docRef = await addDoc(collection(db, 'operatorListesi'), newOperator);
         setOperators([...operators, { id: docRef.id, ...newOperator }]);
       }
 
-      // Reset form fields
       setName('');
       setSurname('');
-      setPhoneNumber('');
       setPassword('');
     } catch (error) {
       console.error('Error adding/updating document: ', error);
@@ -57,7 +52,6 @@ const OperatorEkle = () => {
     setEditOperatorId(operator.id);
     setName(operator.name);
     setSurname(operator.surname);
-    setPhoneNumber(operator.phoneNumber);
     setPassword(operator.password);
   };
 
@@ -95,20 +89,12 @@ const OperatorEkle = () => {
           required
         />
         <input
-          type="text"
-          placeholder="Telefon Numarası"
-          value={phoneNumber}
-          onChange={(e) => setPhoneNumber(e.target.value)}
-          className="operator-input"
-          required
-        />
-        <input
           type="password"
           placeholder="Şifre (4 haneli)"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="operator-input"
-          pattern="\d{4}" // Şifre 4 haneli olacak şekilde kısıtlama
+          pattern="\d{4}"
           title="Lütfen 4 haneli bir şifre giriniz"
           required
         />
@@ -123,7 +109,6 @@ const OperatorEkle = () => {
               setEditOperatorId(null);
               setName('');
               setSurname('');
-              setPhoneNumber('');
               setPassword('');
             }}
             className="cancel-button"
@@ -136,7 +121,7 @@ const OperatorEkle = () => {
       <ul className="operator-list">
         {operators.map((operator) => (
           <li key={operator.id} className="operator-item">
-            <span>{operator.name} {operator.surname} - {operator.phoneNumber} - Şifre: {operator.password}</span>
+            <span>{operator.name} {operator.surname} - Şifre: {operator.password}</span>
             <div className="button-group">
               <button 
                 onClick={() => handleEdit(operator)} 

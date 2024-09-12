@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { getFirestore, collection, getDocs } from 'firebase/firestore';
 import { getStorage, ref, getDownloadURL, listAll } from 'firebase/storage';
-import DatePicker from 'react-datepicker';
+import DatePicker, { registerLocale } from 'react-datepicker';
+import tr from 'date-fns/locale/tr';
 import 'react-datepicker/dist/react-datepicker.css';
 import './Puantajlar.css';
+
+registerLocale('tr', tr);
 
 const Puantajlar = () => {
   const [mergedData, setMergedData] = useState([]);
@@ -12,31 +15,33 @@ const Puantajlar = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedPdfs, setSelectedPdfs] = useState([]);
-  const [totalHours, setTotalHours] = useState('');
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
 
   const [customerNames, setCustomerNames] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState('');
 
-  const [machineNames, setMachineNames] = useState([]); 
+  const [machineNames, setMachineNames] = useState([]);
   const [selectedMachine, setSelectedMachine] = useState('');
 
-  const [operatorNames, setOperatorNames] = useState([]); // Operatör isimleri için yeni state
-  const [selectedOperator, setSelectedOperator] = useState(''); // Seçilen operatör ismi
+  const [operatorNames, setOperatorNames] = useState([]);
+  const [selectedOperator, setSelectedOperator] = useState('');
 
-  const [isHakedisPopupOpen, setIsHakedisPopupOpen] = useState(false); 
+  const [isHakedisPopupOpen, setIsHakedisPopupOpen] = useState(false);
   const [unitRate, setUnitRate] = useState('');
   const [totalHakedis, setTotalHakedis] = useState('');
-  const [popupTotalHours, setPopupTotalHours] = useState('');
+
+  const [calculatedTotalHours, setCalculatedTotalHours] = useState('');
+  const [calculatedTotalMinutes, setCalculatedTotalMinutes] = useState(0);
 
   useEffect(() => {
     fetchCustomerNames();
-    fetchMachineNames(); 
-    fetchOperatorNames(); // Operatör isimlerini al
+    fetchMachineNames();
+    fetchOperatorNames();
     fetchPuantajlarAndPdfs();
   }, []);
 
+  // Define the parseDate function
   const parseDate = (dateString) => {
     if (!dateString) {
       return new Date();
@@ -53,7 +58,8 @@ const Puantajlar = () => {
 
   useEffect(() => {
     setTotalHakedis('');
-    setPopupTotalHours('');
+    setCalculatedTotalHours('');
+    setCalculatedTotalMinutes(0);
 
     let filtered = mergedData;
 
@@ -73,7 +79,7 @@ const Puantajlar = () => {
     }
 
     if (selectedOperator) {
-      filtered = filtered.filter((item) => item['Operatör Adı'] === selectedOperator); // "Operatör Adı" ile filtrele
+      filtered = filtered.filter((item) => item['Operatör Adı'] === selectedOperator);
     }
 
     setFilteredData(filtered);
@@ -204,69 +210,99 @@ const Puantajlar = () => {
   const closePopup = () => {
     setSelectedPdf(null);
   };
+  
+  const formatTime = (timeString) => {
+    if (!timeString || timeString === '""') return null;
+    const [hours, minutes] = timeString.replace(/"/g, '').split(':');
+    return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`;
+  };
 
+  const calculateDuration = (start, end) => {
+    if (!start || !end) return 0;
+    const [startHours, startMinutes] = start.split(':').map(Number);
+    const [endHours, endMinutes] = end.split(':').map(Number);
+    return (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
+  };
+
+  const formatDuration = (minutes) => {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return `${hours} saat ${remainingMinutes} dakika`;
+  };
+
+  const calculateTotalWorkDuration = (item) => {
+    const start1 = formatTime(item['1. Başlangıç Saati']);
+    const end1 = formatTime(item['1. Bitiş Saati']);
+    const start2 = formatTime(item['2. Başlangıç Saati']);
+    const end2 = formatTime(item['2. Bitiş Saati']);
+
+    const duration1 = calculateDuration(start1, end1);
+    const duration2 = calculateDuration(start2, end2);
+
+    return formatDuration(duration1 + duration2);
+  };
+
+  const renderWorkHours = (item) => {
+    const start1 = formatTime(item['1. Başlangıç Saati']);
+    const end1 = formatTime(item['1. Bitiş Saati']);
+    const start2 = formatTime(item['2. Başlangıç Saati']);
+    const end2 = formatTime(item['2. Bitiş Saati']);
+
+    if (start1 && end1) {
+      if (start2 && end2) {
+        return (
+          <td>
+            {start1} || {end1}
+            <br />
+            {start2} || {end2}
+          </td>
+        );
+      } else {
+        return (
+          <td>
+            {start1} || {end1}
+          </td>
+        );
+      }
+    } else {
+      return <td>-</td>;
+    }
+  };
+
+  
   const calculateTotalHours = () => {
     let totalMinutes = 0;
 
     filteredData.forEach(item => {
-      const çalışmaSüresi = item['Çalışma Süresi'];
-      
-      if (çalışmaSüresi) {
-        const { hours, minutes } = parseTime(çalışmaSüresi); 
-        totalMinutes += hours * 60 + minutes;
-      }
+      const start1 = formatTime(item['1. Başlangıç Saati']);
+      const end1 = formatTime(item['1. Bitiş Saati']);
+      const start2 = formatTime(item['2. Başlangıç Saati']);
+      const end2 = formatTime(item['2. Bitiş Saati']);
+
+      totalMinutes += calculateDuration(start1, end1);
+      totalMinutes += calculateDuration(start2, end2);
     });
 
-    const totalHours = Math.floor(totalMinutes / 60);
-    const remainingMinutes = totalMinutes % 60;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
 
-    setTotalHours(`${totalHours} saat ${remainingMinutes} dakika`);
-  };
-
-  const calculatePopupTotalHours = () => {
-    let totalMinutes = 0;
-
-    filteredData.forEach(item => {
-      const çalışmaSüresi = item['Çalışma Süresi'];
-      
-      if (çalışmaSüresi) {
-        const { hours, minutes } = parseTime(çalışmaSüresi); 
-        totalMinutes += hours * 60 + minutes;
-      }
-    });
-
-    const totalHours = Math.floor(totalMinutes / 60);
-    const remainingMinutes = totalMinutes % 60;
-
-    setPopupTotalHours(`${totalHours} saat ${remainingMinutes} dakika`);
-  };
-
-  const parseTime = (timeString) => {
-    const hourMatch = timeString.match(/(\d+)\s*saat/);
-    const minuteMatch = timeString.match(/(\d+)\s*dakika/);
-
-    const hours = hourMatch ? parseInt(hourMatch[1], 10) : 0;
-    const minutes = minuteMatch ? parseInt(minuteMatch[1], 10) : 0;
-
-    return { hours, minutes };
+    setCalculatedTotalHours(`${hours} saat ${minutes} dakika`);
+    setCalculatedTotalMinutes(totalMinutes);
   };
 
   const handleHakedisHesapla = () => {
-    if (popupTotalHours && unitRate) {
-      const [hours] = popupTotalHours.split(' ');
-      const totalAmount = parseFloat(hours) * parseFloat(unitRate);
+    if (calculatedTotalMinutes && unitRate) {
+      const totalHours = calculatedTotalMinutes / 60;
+      const totalAmount = totalHours * parseFloat(unitRate);
       setTotalHakedis(`${totalAmount.toFixed(2)} TL`);
-
-      setTimeout(() => {
-        setIsHakedisPopupOpen(false);
-      }, 1000);
     }
   };
-
   const openHakedisPopup = () => {
     setIsHakedisPopupOpen(true);
   };
-
+  const closeHakedisPopup = () => {
+    setIsHakedisPopupOpen(false);
+  };
   if (loading) {
     return <div>Yükleniyor...</div>;
   }
@@ -277,7 +313,7 @@ const Puantajlar = () => {
 
   return (
     <div className="puantajlar-container">
-      <h2>Puantajlar ------- Mücahit abi selamun aleyküm</h2>
+      <h2>Puantajlar</h2>
 
       <div className="filter-container">
         {/* Tarih Filtresi */}
@@ -291,6 +327,7 @@ const Puantajlar = () => {
             endDate={endDate}
             dateFormat="dd.MM.yyyy"
             placeholderText="Başlangıç Tarihi"
+            locale="tr"
           />
           <DatePicker
             selected={endDate}
@@ -301,9 +338,9 @@ const Puantajlar = () => {
             minDate={startDate}
             dateFormat="dd.MM.yyyy"
             placeholderText="Bitiş Tarihi"
+            locale="tr"
           />
         </div>
-
         {/* Müşteri Adı Filtresi */}
         <div className="customer-filter">
           <label>Müşteri Adı Seçin: </label>
@@ -352,17 +389,15 @@ const Puantajlar = () => {
           </select>
         </div>
 
-        {/* Toplam Saat Hesapla Butonu */}
         <div className="total-hours">
-          <button onClick={calculateTotalHours}>Toplam Saat Hesapla</button>
-          <p>: {totalHours}</p>
-        </div>
+        <button onClick={calculateTotalHours}>Toplam Saat Hesapla</button>
+        <p>: {calculatedTotalHours}</p>
+      </div>
 
-        {/* Hakediş Hesapla Butonu */}
-        <div className="hakedis-calculate">
-          <button onClick={openHakedisPopup}>Hakediş Hesapla</button>
-          <p>: {totalHakedis}</p>
-        </div>
+      <div className="hakedis-calculate">
+        <button onClick={openHakedisPopup}>Hakediş Hesapla</button>
+        <p>: {totalHakedis}</p>
+      </div>
 
         {/* Seçme Butonları */}
         <div className="button-group">
@@ -386,11 +421,10 @@ const Puantajlar = () => {
                 <th>Seç</th>
                 <th>PDF / Sözleşme Numarası</th>
                 <th>Müşteri Adı</th>
-                <th>Makine İsmi</th> 
-                <th>Operatör Adı</th> {/* Yeni "Operatör Adı" alanı */}
-                <th>Çalışma Süresi</th>
-                <th>Başlangıç Saati</th>
-                <th>Bitiş Saati</th>
+                <th>Makine İsmi</th>
+                <th>Operatör Adı</th>
+                <th>Çalışma Saatleri</th>
+                <th>Toplam Çalışma Süresi</th>
                 <th>Tarih</th>
                 <th>Yetkili Adı</th>
                 <th>Çalışma Detayı</th>
@@ -415,11 +449,10 @@ const Puantajlar = () => {
                     </button>
                   </td>
                   <td>{item['Müşteri Adı'] || '-'}</td>
-                  <td>{item['Makine İsmi'] || '-'}</td> 
-                  <td>{item['Operatör Adı'] || '-'}</td> {/* "Operatör Adı" burada gösteriliyor */}
-                  <td>{item['Çalışma Süresi'] || '-'}</td>
-                  <td>{item['Başlangıç Saati'] || '-'}</td>
-                  <td>{item['Bitiş Saati'] || '-'}</td>
+                  <td>{item['Makine İsmi'] || '-'}</td>
+                  <td>{item['Operatör Adı'] || '-'}</td>
+                  {renderWorkHours(item)}
+                  <td>{calculateTotalWorkDuration(item)}</td>
                   <td>{item['Tarih'] || '-'}</td>
                   <td>{item['Yetkili Adı'] || '-'}</td>
                   <td>{item['Çalışma Detayı'] || '-'}</td>
@@ -442,7 +475,7 @@ const Puantajlar = () => {
         </div>
       )}
 
-      {isHakedisPopupOpen && (
+{isHakedisPopupOpen && (
         <div className="modal">
           <div className="modal-content">
             <h3>Birim Saat Giriniz</h3>
@@ -453,10 +486,10 @@ const Puantajlar = () => {
               placeholder="Birim Saat"
             />
             <div className="popup-total-hours">
-              <button onClick={calculatePopupTotalHours}>Toplam Saat Hesapla</button>
-              <p>: {popupTotalHours}</p>
+              <p>Toplam Saat: {calculatedTotalHours}</p>
             </div>
             <button onClick={handleHakedisHesapla}>Hesapla</button>
+            <button onClick={closeHakedisPopup} className="close-button">Kapat</button>
           </div>
         </div>
       )}

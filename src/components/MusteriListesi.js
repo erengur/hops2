@@ -80,7 +80,6 @@ const MusteriListesi = ({ theme }) => {
     }
   };
 
-  // Müşteriyi silme fonksiyonu (doğrulama sonrası)
   const handleDeleteCustomer = async () => {
     const db = getFirestore();
     try {
@@ -89,16 +88,20 @@ const MusteriListesi = ({ theme }) => {
       // Silinen müşteriyi listeden çıkarıyoruz
       setCustomers(prevCustomers => prevCustomers.filter(cust => cust.id !== customerToDelete.id));
 
-      // Başarı mesajını göster ve 2 saniye sonra modal'ı kapat
+      // Başarı mesajını göster
       setSuccessMessage('Müşteri başarıyla silinmiştir.');
 
+      // Modal'ı kapat
+      setIsDeleteModalOpen(false);
+
+      // 2 saniye sonra başarı mesajını temizle
       setTimeout(() => {
         setSuccessMessage('');
-        setIsDeleteModalOpen(false); // 2 saniye sonra pop-up'ı kapat
       }, 2000);
 
     } catch (error) {
       console.error('Müşteri silinirken bir hata oluştu: ', error);
+      setError('Müşteri silinirken bir hata oluştu.');
     }
   };
 
@@ -243,7 +246,7 @@ const MusteriListesi = ({ theme }) => {
         <div className={`modal ${theme}`}>
           <div className={`modal-content ${theme}`}>
             <h3>Müşteriyi Sil</h3>
-            <p>Bu müşteri silinecektir, emin misiniz?</p>
+            <p>Bu müşteriyi silmek istediğinizden emin misiniz?</p>
             <div className="form-group">
               <strong>Müşteri Adı:</strong> {customerToDelete['Müşteri Adı']}
             </div>
@@ -254,7 +257,8 @@ const MusteriListesi = ({ theme }) => {
               <strong>E-posta:</strong> {customerToDelete['E-posta']}
             </div>
 
-            {successMessage && <div className="success-message">{successMessage}</div>} {/* Başarı mesajı */}
+            {successMessage && <div className="success-message">{successMessage}</div>}
+            {error && <div className="error-message">{error}</div>}
 
             <div className="modal-actions">
               <button onClick={handleDeleteCustomer}>Sil</button>

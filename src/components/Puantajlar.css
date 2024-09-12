@@ -459,3 +459,50 @@ input[type="checkbox"]:checked::before {
 .operator-filter select:focus {
   border-color: #007bff; /* Blue border on focus */
 }
+/* Hakediş Popup Stili */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: white;
+  padding: 20px;
+  border-radius: 5px;
+  width: 300px;
+}
+
+.modal-content h3 {
+  margin-top: 0;
+}
+
+.modal-content input {
+  width: 100%;
+  padding: 5px;
+  margin-bottom: 10px;
+}
+
+.modal-content button {
+  margin-right: 10px;
+}
+
+.close-button {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.close-button:hover {
+  background-color: #c82333;
+}
