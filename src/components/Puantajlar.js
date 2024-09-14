@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getFirestore, collection, getDocs } from 'firebase/firestore';
 import { getStorage, ref, getDownloadURL, listAll } from 'firebase/storage';
 import DatePicker, { registerLocale } from 'react-datepicker';
@@ -34,6 +34,10 @@ const Puantajlar = () => {
   const [calculatedTotalHours, setCalculatedTotalHours] = useState('');
   const [calculatedTotalMinutes, setCalculatedTotalMinutes] = useState(0);
 
+  const [isCalculating, setIsCalculating] = useState(false);
+
+  const modalRef = useRef(null);
+
   useEffect(() => {
     fetchCustomerNames();
     fetchMachineNames();
@@ -41,18 +45,17 @@ const Puantajlar = () => {
     fetchPuantajlarAndPdfs();
   }, []);
 
-  // Define the parseDate function
   const parseDate = (dateString) => {
     if (!dateString) {
       return new Date();
     }
-    
+
     const [day, month, year] = dateString.split('.');
-    
+
     if (!day || !month || !year) {
       return new Date();
     }
-    
+
     return new Date(`${year}-${month}-${day}T00:00:00`);
   };
 
@@ -139,7 +142,7 @@ const Puantajlar = () => {
         return {
           pdfName: itemRef.name,
           pdfRef: itemRef,
-          ...matchingPuantaj
+          ...(matchingPuantaj || {})
         };
       });
 
@@ -173,7 +176,7 @@ const Puantajlar = () => {
     if (selectedPdfs.length === 0) return;
 
     const storage = getStorage();
-  
+
     for (const pdfName of selectedPdfs) {
       try {
         const pdfRef = ref(storage, `pdfs/${pdfName}`);
@@ -210,10 +213,11 @@ const Puantajlar = () => {
   const closePopup = () => {
     setSelectedPdf(null);
   };
-  
+
   const formatTime = (timeString) => {
     if (!timeString || timeString === '""') return null;
     const [hours, minutes] = timeString.replace(/"/g, '').split(':');
+    if (!hours || !minutes) return null;
     return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`;
   };
 
@@ -221,7 +225,11 @@ const Puantajlar = () => {
     if (!start || !end) return 0;
     const [startHours, startMinutes] = start.split(':').map(Number);
     const [endHours, endMinutes] = end.split(':').map(Number);
-    return (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
+    let duration = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
+    if (duration < 0) {
+      duration += 24 * 60; // Ertesi güne sarkan saatler için
+    }
+    return duration;
   };
 
   const formatDuration = (minutes) => {
@@ -239,7 +247,13 @@ const Puantajlar = () => {
     const duration1 = calculateDuration(start1, end1);
     const duration2 = calculateDuration(start2, end2);
 
-    return formatDuration(duration1 + duration2);
+    const totalDuration = duration1 + duration2;
+
+    if (totalDuration === 0) {
+      return '-';
+    }
+
+    return formatDuration(totalDuration);
   };
 
   const renderWorkHours = (item) => {
@@ -251,25 +265,24 @@ const Puantajlar = () => {
     if (start1 && end1) {
       if (start2 && end2) {
         return (
-          <td>
+          <>
             {start1} || {end1}
             <br />
             {start2} || {end2}
-          </td>
+          </>
         );
       } else {
         return (
-          <td>
+          <>
             {start1} || {end1}
-          </td>
+          </>
         );
       }
     } else {
-      return <td>-</td>;
+      return '-';
     }
   };
 
-  
   const calculateTotalHours = () => {
     let totalMinutes = 0;
 
@@ -288,21 +301,65 @@ const Puantajlar = () => {
 
     setCalculatedTotalHours(`${hours} saat ${minutes} dakika`);
     setCalculatedTotalMinutes(totalMinutes);
+
+    return totalMinutes;
   };
 
   const handleHakedisHesapla = () => {
-    if (calculatedTotalMinutes && unitRate) {
-      const totalHours = calculatedTotalMinutes / 60;
+    let minutes = calculatedTotalMinutes;
+
+    if (minutes === 0) {
+      minutes = calculateTotalHours();
+    }
+
+    if (unitRate) {
+      setIsCalculating(true);
+      const totalHours = minutes / 60;
       const totalAmount = totalHours * parseFloat(unitRate);
-      setTotalHakedis(`${totalAmount.toFixed(2)} TL`);
+
+      const formattedAmount = new Intl.NumberFormat('tr-TR', {
+        style: 'currency',
+        currency: 'TRY',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(totalAmount);
+
+      setTotalHakedis(formattedAmount);
+
+      setTimeout(() => {
+        setIsHakedisPopupOpen(false);
+        setIsCalculating(false);
+      }, 1000);
+    } else {
+      alert("Lütfen birim saat ücretini giriniz.");
     }
   };
+
   const openHakedisPopup = () => {
+    if (calculatedTotalMinutes === 0) {
+      calculateTotalHours();
+    }
     setIsHakedisPopupOpen(true);
   };
+
   const closeHakedisPopup = () => {
     setIsHakedisPopupOpen(false);
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        closeHakedisPopup();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   if (loading) {
     return <div>Yükleniyor...</div>;
   }
@@ -316,151 +373,153 @@ const Puantajlar = () => {
       <h2>Puantajlar</h2>
 
       <div className="filter-container">
-        {/* Tarih Filtresi */}
-        <div className="date-filter">
-          <label>Tarih Aralığı Seçin: </label>
-          <DatePicker
-            selected={startDate}
-            onChange={date => setStartDate(date)}
-            selectsStart
-            startDate={startDate}
-            endDate={endDate}
-            dateFormat="dd.MM.yyyy"
-            placeholderText="Başlangıç Tarihi"
-            locale="tr"
-          />
-          <DatePicker
-            selected={endDate}
-            onChange={date => setEndDate(date)}
-            selectsEnd
-            startDate={startDate}
-            endDate={endDate}
-            minDate={startDate}
-            dateFormat="dd.MM.yyyy"
-            placeholderText="Bitiş Tarihi"
-            locale="tr"
-          />
+        <div className="left-filters">
+          {/* Tarih Filtresi */}
+          <div className="date-filter">
+            <label>Tarih Aralığı Seçin: </label>
+            <DatePicker
+              selected={startDate}
+              onChange={date => setStartDate(date)}
+              selectsStart
+              startDate={startDate}
+              endDate={endDate}
+              dateFormat="dd.MM.yyyy"
+              placeholderText="Başlangıç Tarihi"
+              locale="tr"
+            />
+            <DatePicker
+              selected={endDate}
+              onChange={date => setEndDate(date)}
+              selectsEnd
+              startDate={startDate}
+              endDate={endDate}
+              minDate={startDate}
+              dateFormat="dd.MM.yyyy"
+              placeholderText="Bitiş Tarihi"
+              locale="tr"
+            />
+          </div>
+
+          {/* Müşteri Adı Filtresi */}
+          <div className="customer-filter">
+            <label>Müşteri Adı Seçin: </label>
+            <select
+              value={selectedCustomer}
+              onChange={(e) => setSelectedCustomer(e.target.value)}
+            >
+              <option value="">Hepsi</option>
+              {customerNames.map((name, index) => (
+                <option key={index} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Makine Adı Filtresi */}
+          <div className="machine-filter">
+            <label>Makine Adı Seçin: </label>
+            <select
+              value={selectedMachine}
+              onChange={(e) => setSelectedMachine(e.target.value)}
+            >
+              <option value="">Hepsi</option>
+              {machineNames.map((name, index) => (
+                <option key={index} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Operatör Adı Filtresi */}
+          <div className="operator-filter">
+            <label>Operatör Adı Seçin: </label>
+            <select
+              value={selectedOperator}
+              onChange={(e) => setSelectedOperator(e.target.value)}
+            >
+              <option value="">Hepsi</option>
+              {operatorNames.map((name, index) => (
+                <option key={index} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Seçme Butonları */}
+          <div className="button-group">
+            <button onClick={handleSelectAll}>Hepsini Seç</button>
+            <button onClick={handleDeselectAll}>Seçimleri Kaldır</button>
+            <button
+              onClick={handleDownloadSelected}
+              disabled={selectedPdfs.length === 0}
+              className="download-button-inline"
+            >
+              Seçili PDF'leri İndir
+            </button>
+          </div>
         </div>
-        {/* Müşteri Adı Filtresi */}
-        <div className="customer-filter">
-          <label>Müşteri Adı Seçin: </label>
-          <select
-            value={selectedCustomer}
-            onChange={(e) => setSelectedCustomer(e.target.value)}
-          >
-            <option value="">Hepsi</option>
-            {customerNames.map((name, index) => (
-              <option key={index} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </div>
 
-        {/* Makine Adı Filtresi */}
-        <div className="machine-filter">
-          <label>Makine Adı Seçin: </label>
-          <select
-            value={selectedMachine}
-            onChange={(e) => setSelectedMachine(e.target.value)}
-          >
-            <option value="">Hepsi</option>
-            {machineNames.map((name, index) => (
-              <option key={index} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Operatör Adı Filtresi */}
-        <div className="operator-filter">
-          <label>Operatör Adı Seçin: </label>
-          <select
-            value={selectedOperator}
-            onChange={(e) => setSelectedOperator(e.target.value)}
-          >
-            <option value="">Hepsi</option>
-            {operatorNames.map((name, index) => (
-              <option key={index} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="total-hours">
-        <button onClick={calculateTotalHours}>Toplam Saat Hesapla</button>
-        <p>: {calculatedTotalHours}</p>
-      </div>
-
-      <div className="hakedis-calculate">
-        <button onClick={openHakedisPopup}>Hakediş Hesapla</button>
-        <p>: {totalHakedis}</p>
-      </div>
-
-        {/* Seçme Butonları */}
-        <div className="button-group">
-          <button onClick={handleSelectAll}>Hepsini Seç</button>
-          <button onClick={handleDeselectAll}>Seçimleri Kaldır</button>
-          <button
-            onClick={handleDownloadSelected}
-            disabled={selectedPdfs.length === 0}
-            className="download-button-inline"
-          >
-            Seçili PDF'leri İndir
-          </button>
+        <div className="right-buttons">
+          <div className="calculation-row">
+            <p className="result">{calculatedTotalHours}</p>
+            <button onClick={calculateTotalHours}>Toplam Saat Hesapla</button>
+          </div>
+          <div className="calculation-row">
+            <p className="result">{totalHakedis}</p>
+            <button onClick={openHakedisPopup}>Hakediş Hesapla</button>
+          </div>
         </div>
       </div>
 
       {filteredData.length > 0 && (
-        <>
-          <table className="puantajlar-table">
-            <thead>
-              <tr>
-                <th>Seç</th>
-                <th>PDF / Sözleşme Numarası</th>
-                <th>Müşteri Adı</th>
-                <th>Makine İsmi</th>
-                <th>Operatör Adı</th>
-                <th>Çalışma Saatleri</th>
-                <th>Toplam Çalışma Süresi</th>
-                <th>Tarih</th>
-                <th>Yetkili Adı</th>
-                <th>Çalışma Detayı</th>
+        <table className="puantajlar-table">
+          <thead>
+            <tr>
+              <th>Seç</th>
+              <th>PDF / Sözleşme Numarası</th>
+              <th>Müşteri Adı</th>
+              <th>Makine İsmi</th>
+              <th>Operatör Adı</th>
+              <th>Çalışma Saatleri</th>
+              <th>Toplam Çalışma Süresi</th>
+              <th>Tarih</th>
+              <th>Yetkili Adı</th>
+              <th>Çalışma Detayı</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredData.map((item, index) => (
+              <tr key={index}>
+                <td>
+                  <input
+                    type="checkbox"
+                    onChange={() => handleCheckboxChange(item.pdfName)}
+                    checked={selectedPdfs.includes(item.pdfName)}
+                  />
+                </td>
+                <td>
+                  <button
+                    className="link-button"
+                    onClick={() => handlePdfClick(item.pdfRef, item.pdfName)}
+                  >
+                    {item.pdfName}
+                  </button>
+                </td>
+                <td>{item['Müşteri Adı'] || '-'}</td>
+                <td>{item['Makine İsmi'] || '-'}</td>
+                <td>{item['Operatör Adı'] || '-'}</td>
+                <td>{renderWorkHours(item)}</td>
+                <td>{calculateTotalWorkDuration(item)}</td>
+                <td>{item['Tarih'] || '-'}</td>
+                <td>{item['Yetkili Adı'] || '-'}</td>
+                <td>{item['Çalışma Detayı'] || '-'}</td>
               </tr>
-            </thead>
-            <tbody>
-              {filteredData.map((item, index) => (
-                <tr key={index}>
-                  <td>
-                    <input
-                      type="checkbox"
-                      onChange={() => handleCheckboxChange(item.pdfName)}
-                      checked={selectedPdfs.includes(item.pdfName)}
-                    />
-                  </td>
-                  <td>
-                    <button
-                      className="link-button"
-                      onClick={() => handlePdfClick(item.pdfRef, item.pdfName)}
-                    >
-                      {item.pdfName}
-                    </button>
-                  </td>
-                  <td>{item['Müşteri Adı'] || '-'}</td>
-                  <td>{item['Makine İsmi'] || '-'}</td>
-                  <td>{item['Operatör Adı'] || '-'}</td>
-                  {renderWorkHours(item)}
-                  <td>{calculateTotalWorkDuration(item)}</td>
-                  <td>{item['Tarih'] || '-'}</td>
-                  <td>{item['Yetkili Adı'] || '-'}</td>
-                  <td>{item['Çalışma Detayı'] || '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
+            ))}
+          </tbody>
+        </table>
       )}
 
       {selectedPdf && (
@@ -475,9 +534,9 @@ const Puantajlar = () => {
         </div>
       )}
 
-{isHakedisPopupOpen && (
-        <div className="modal">
-          <div className="modal-content">
+      {isHakedisPopupOpen && (
+        <div className="modal" onClick={closeHakedisPopup}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3>Birim Saat Giriniz</h3>
             <input
               type="number"
@@ -488,8 +547,12 @@ const Puantajlar = () => {
             <div className="popup-total-hours">
               <p>Toplam Saat: {calculatedTotalHours}</p>
             </div>
-            <button onClick={handleHakedisHesapla}>Hesapla</button>
-            <button onClick={closeHakedisPopup} className="close-button">Kapat</button>
+            <button onClick={handleHakedisHesapla} disabled={isCalculating}>
+              {isCalculating ? 'Hesaplanıyor...' : 'Hesapla'}
+            </button>
+            <button onClick={closeHakedisPopup} className="close-button" disabled={isCalculating}>
+              Kapat
+            </button>
           </div>
         </div>
       )}
