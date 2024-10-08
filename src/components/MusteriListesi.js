@@ -33,7 +33,7 @@ import {
 import { styled } from '@mui/material/styles';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 
-// Stiller
+// Styled Components
 const ModalBox = styled(Box)(({ theme }) => ({
   position: 'absolute',
   top: '50%',
@@ -79,6 +79,21 @@ const ConfirmUpdateBox = styled(Box)(({ theme }) => ({
   border: '1px solid #ccc',
 }));
 
+const ConflictResolutionBox = styled(Box)(({ theme }) => ({
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  width: 700,
+  backgroundColor: '#ffffff',
+  color: '#000000',
+  boxShadow: theme.shadows[5],
+  padding: theme.spacing(3, 4, 4),
+  maxHeight: '80vh',
+  overflowY: 'auto',
+  border: '1px solid #ccc',
+}));
+
 const TableContainerStyled = styled(TableContainer)(({ theme }) => ({
   '& .MuiTableCell-root': {
     borderBottom: '1px solid #ccc',
@@ -90,7 +105,7 @@ const TableContainerStyled = styled(TableContainer)(({ theme }) => ({
 }));
 
 const MusteriListesi = () => {
-  // Durum Değişkenleri
+  // State Variables
   const [approvedCustomers, setApprovedCustomers] = useState([]);
   const [pendingCustomers, setPendingCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -104,24 +119,31 @@ const MusteriListesi = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [alertOpen, setAlertOpen] = useState(false);
 
-  // Edit Modal Alanları
+  // Duplicate Handling
+  const [duplicateCount, setDuplicateCount] = useState(0);
+
+  // Edit Modal Fields
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editCariCode, setEditCariCode] = useState('');
 
-  // Add Modal Alanları
+  // Add Modal Fields
   const [newCustomerName, setNewCustomerName] = useState('');
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [newCustomerEmail, setNewCustomerEmail] = useState('');
   const [newCustomerCariCode, setNewCustomerCariCode] = useState('');
 
-  // Company List Modal ve Arama
+  // Company List Modal and Search
   const [isCompanyListModalOpen, setIsCompanyListModalOpen] = useState(false);
   const [searchName, setSearchName] = useState('');
   const [searchCariCode, setSearchCariCode] = useState('');
 
-  // Firestore Verilerini Dinleme
+  // Conflict Resolution Modal State
+  const [conflictingCompanies, setConflictingCompanies] = useState([]);
+  const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
+
+  // Firestore Real-time Listener
   useEffect(() => {
     const db = getFirestore();
     const unsubscribe = onSnapshot(
@@ -130,6 +152,8 @@ const MusteriListesi = () => {
         const customerData = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
+          'Müşteri Adı': doc.data()['Müşteri Adı'] || '',
+          'cariCode': doc.data()['cariCode'] || '',
         }));
 
         const pending = customerData.filter(
@@ -153,9 +177,9 @@ const MusteriListesi = () => {
     return () => unsubscribe();
   }, []);
 
-  // Yeni Müşteri Ekleme
+  // Add New Customer
   const handleAddNewCustomer = async () => {
-    if (!newCustomerName.trim() || !newCustomerCariCode.trim()) {
+    if (!(newCustomerName?.trim()) || !(newCustomerCariCode?.trim())) {
       setError('Müşteri adı ve cari kodu gereklidir.');
       setAlertOpen(true);
       return;
@@ -163,10 +187,26 @@ const MusteriListesi = () => {
 
     const db = getFirestore();
     try {
+      // Check for duplicates before adding
+      const customerListRef = collection(db, 'müşteri listesi');
+      const duplicateQuery = query(
+        customerListRef,
+        where('Müşteri Adı', '==', newCustomerName.trim()),
+        where('cariCode', '==', newCustomerCariCode.trim())
+      );
+
+      const duplicateSnapshot = await getDocs(duplicateQuery);
+
+      if (!duplicateSnapshot.empty) {
+        setError('Bu müşteri adı ve cari kod kombinasyonu zaten mevcut.');
+        setAlertOpen(true);
+        return;
+      }
+
       await addDoc(collection(db, 'müşteri listesi'), {
         'Müşteri Adı': newCustomerName.trim(),
-        Telefon: newCustomerPhone.trim(),
-        'E-posta': newCustomerEmail.trim(),
+        Telefon: (newCustomerPhone || '').trim(),
+        'E-posta': (newCustomerEmail || '').trim(),
         Onay: 'Onay Bekliyor',
         cariCode: newCustomerCariCode.trim(),
       });
@@ -185,82 +225,114 @@ const MusteriListesi = () => {
     }
   };
 
-  // Müşteri Güncelleme
-  const handleUpdateCustomer = () => {
-    if (!editName.trim() || !editCariCode.trim()) {
+  // Update Customer with Conflict and Duplicate Checks
+  const handleUpdateCustomer = async () => {
+    if (!(editName?.trim()) || !(editCariCode?.trim())) {
       setError('Müşteri adı ve cari kodu gereklidir.');
       setAlertOpen(true);
       return;
     }
 
-    // Değişiklikleri Belirleme
+    const db = getFirestore();
+
+    // If Cari Kodu is being updated, check for conflicts
+    if (editCariCode.trim() !== (selectedCustomer.cariCode || '').trim()) {
+      const customerListRef = collection(db, 'müşteri listesi');
+      const cariCodeQuery = query(
+        customerListRef,
+        where('cariCode', '==', editCariCode.trim()),
+        where('__name__', '!=', selectedCustomer.id)
+      );
+
+      try {
+        const querySnapshot = await getDocs(cariCodeQuery);
+        if (!querySnapshot.empty) {
+          // Conflicts found
+          const conflicts = querySnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+            'Müşteri Adı': doc.data()['Müşteri Adı'] || '',
+            'cariCode': doc.data()['cariCode'] || '',
+          }));
+          setConflictingCompanies(conflicts);
+          setIsConflictModalOpen(true);
+          return;
+        }
+      } catch (error) {
+        console.error('Cari Kodu kontrolü sırasında hata:', error);
+        setError('Cari Kodu kontrolü sırasında bir hata oluştu.');
+        setAlertOpen(true);
+        return;
+      }
+    }
+
+    // No conflicts, proceed with update
+    proceedWithUpdate();
+  };
+
+  // Proceed with Update after Conflict Resolution or if No Conflict
+  const proceedWithUpdate = () => {
+    // Determine Changes
     const changes = [];
-    if (editName.trim() !== selectedCustomer['Müşteri Adı']) {
+    if ((editName || '').trim() !== (selectedCustomer['Müşteri Adı'] || '').trim()) {
       changes.push({
         field: 'Müşteri Adı',
-        old: selectedCustomer['Müşteri Adı'],
-        new: editName.trim(),
+        old: selectedCustomer['Müşteri Adı'] || '',
+        new: (editName || '').trim(),
       });
     }
-    if (editPhone.trim() !== selectedCustomer['Telefon']) {
+    if ((editPhone || '').trim() !== (selectedCustomer['Telefon'] || '').trim()) {
       changes.push({
         field: 'Telefon',
-        old: selectedCustomer['Telefon'],
-        new: editPhone.trim(),
+        old: selectedCustomer['Telefon'] || '',
+        new: (editPhone || '').trim(),
       });
     }
-    if (editEmail.trim() !== selectedCustomer['E-posta']) {
+    if ((editEmail || '').trim() !== (selectedCustomer['E-posta'] || '').trim()) {
       changes.push({
         field: 'E-posta',
-        old: selectedCustomer['E-posta'],
-        new: editEmail.trim(),
+        old: selectedCustomer['E-posta'] || '',
+        new: (editEmail || '').trim(),
       });
     }
-    if (editCariCode.trim() !== selectedCustomer.cariCode) {
+    if ((editCariCode || '').trim() !== (selectedCustomer.cariCode || '').trim()) {
       changes.push({
         field: 'Cari Kodu',
-        old: selectedCustomer.cariCode,
-        new: editCariCode.trim(),
+        old: selectedCustomer.cariCode || '',
+        new: (editCariCode || '').trim(),
       });
     }
 
-    // Değişiklik kontrolünü kaldırarak güncellemeye izin verme
-    // Böylece, sadece 'Onay' durumu güncellendiğinde bile işlem başarılı olur
-    /*
-    if (changes.length === 0) {
-      setError('Değişiklik yapılmadı.');
-      setAlertOpen(true);
-      return;
-    }
-    */
-
-    // Değişiklikleri ayarlama ve onay dialogunu açma
+    // Set Changes and Open Confirm Update Modal
     setUpdateChanges(changes);
     setIsConfirmUpdateOpen(true);
   };
 
-  // Güncellemeyi Onaylama
+  // Confirm Update
   const confirmUpdate = async () => {
-    setIsConfirmUpdateOpen(false); // Onay modalını kapatma
+    setIsConfirmUpdateOpen(false); // Close Confirm Modal
 
     const db = getFirestore();
     try {
-      const oldCustomerName = selectedCustomer['Müşteri Adı'];
-      const oldCariCode = selectedCustomer.cariCode;
+      const oldCustomerName = (selectedCustomer['Müşteri Adı'] || '').trim();
+      const oldCariCode = (selectedCustomer.cariCode || '').trim();
 
-      // Müşteri belgesini güncelle
+      // Update Customer Document
       const customerRef = doc(db, 'müşteri listesi', selectedCustomer.id);
       await updateDoc(customerRef, {
         'Müşteri Adı': editName.trim(),
         Telefon: editPhone.trim(),
         'E-posta': editEmail.trim(),
         cariCode: editCariCode.trim(),
-        Onay: 'Onaylandı', // Onay durumunu güncelleme
+        Onay: 'Onaylandı', // Update Approval Status
       });
 
-      // Puantajları güncelle
+      // Update Related Puantajlar
       const puantajlarRef = collection(db, 'puantajlar');
-      const q = query(puantajlarRef, where('Müşteri Adı', '==', oldCustomerName));
+      const q = query(
+        puantajlarRef,
+        where('Müşteri Adı', '==', oldCustomerName)
+      );
       const puantajlarSnapshot = await getDocs(q);
 
       const batch = writeBatch(db);
@@ -270,15 +342,38 @@ const MusteriListesi = () => {
           'Cari Kodu': editCariCode.trim(),
         });
       });
+
+      // Now, check for duplicates: other customers with same name and cari code
+      const customerListRef = collection(db, 'müşteri listesi');
+      const duplicateQuery = query(
+        customerListRef,
+        where('Müşteri Adı', '==', editName.trim()),
+        where('cariCode', '==', editCariCode.trim()),
+        where('__name__', '!=', selectedCustomer.id)
+      );
+
+      const duplicateSnapshot = await getDocs(duplicateQuery);
+
+      if (!duplicateSnapshot.empty) {
+        duplicateSnapshot.forEach((duplicateDoc) => {
+          batch.delete(duplicateDoc.ref);
+        });
+        setDuplicateCount(duplicateSnapshot.size);
+        console.log(`Duplicate customers found and deleted: ${duplicateSnapshot.size}`);
+      }
+
       await batch.commit();
 
-      console.log(`${puantajlarSnapshot.size} puantaj kaydı güncellendi.`);
-
-      setSuccessMessage('Müşteri başarıyla güncellendi.');
+      if (duplicateCount > 0) {
+        setSuccessMessage(`Müşteri başarıyla güncellendi. ${duplicateCount} adet kopya silindi.`);
+      } else {
+        setSuccessMessage('Müşteri başarıyla güncellendi.');
+      }
       setAlertOpen(true);
       setIsEditModalOpen(false);
       setSelectedCustomer(null);
       setUpdateChanges([]);
+      setDuplicateCount(0); // Reset duplicate count
     } catch (error) {
       console.error('Müşteri güncellenirken bir hata oluştu:', error);
       setError('Müşteri güncellenirken bir hata oluştu.');
@@ -286,13 +381,13 @@ const MusteriListesi = () => {
     }
   };
 
-  // Güncellemeyi İptal Etme
+  // Cancel Update
   const cancelUpdate = () => {
     setIsConfirmUpdateOpen(false);
     setUpdateChanges([]);
   };
 
-  // Müşteri Silme
+  // Delete Customer
   const handleDeleteCustomer = async () => {
     if (!selectedCustomer) return;
 
@@ -300,11 +395,11 @@ const MusteriListesi = () => {
     try {
       await deleteDoc(doc(db, 'müşteri listesi', selectedCustomer.id));
 
-      // Puantajlardaki müşteri bilgilerini güncelle
+      // Update Puantajlar Related to the Deleted Customer
       const puantajlarRef = collection(db, 'puantajlar');
       const q = query(
         puantajlarRef,
-        where('Cari Kodu', '==', selectedCustomer.cariCode)
+        where('Cari Kodu', '==', selectedCustomer.cariCode || '')
       );
       const puantajlarSnapshot = await getDocs(q);
 
@@ -328,42 +423,86 @@ const MusteriListesi = () => {
     }
   };
 
-  // Düzenleme Modalını Açma
+  // Open Edit Modal
   const openEditModal = (customer) => {
     setSelectedCustomer(customer);
-    setEditName(customer['Müşteri Adı']);
-    setEditPhone(customer['Telefon']);
-    setEditEmail(customer['E-posta']);
-    setEditCariCode(customer['cariCode']);
+    setEditName(customer['Müşteri Adı'] || '');
+    setEditPhone(customer['Telefon'] || '');
+    setEditEmail(customer['E-posta'] || '');
+    setEditCariCode(customer['cariCode'] || '');
     setIsEditModalOpen(true);
   };
 
-  // Firma Seçimi
+  // Company Selection from Company List Modal
   const handleCompanySelect = (company) => {
-    setEditName(company['Müşteri Adı']);
-    setEditCariCode(company['cariCode']);
+    setEditName(company['Müşteri Adı'] || '');
+    setEditCariCode(company['cariCode'] || '');
     setIsCompanyListModalOpen(false);
   };
 
-  // Alert Kapatma
+  // Alert Close Handler
   const handleCloseAlert = () => {
     setAlertOpen(false);
     setError(null);
     setSuccessMessage('');
   };
 
-  // Filtrelenmiş Firmaları Alma
+  // Filtered Companies for Company List Modal
   const filteredCompanies = approvedCustomers.filter(
     (company) =>
-      company['Müşteri Adı']
+      (company['Müşteri Adı'] || '')
         .toLowerCase()
         .includes(searchName.toLowerCase()) &&
-      company['cariCode']
+      (company['cariCode'] || '')
         .toLowerCase()
         .includes(searchCariCode.toLowerCase())
   );
 
-  // Yükleniyor Durumu
+  // Handle Conflict Resolution Changes
+  const handleConflictChange = (id, newCariCode) => {
+    setConflictingCompanies((prev) =>
+      prev.map((company) =>
+        company.id === id ? { ...company, cariCode: newCariCode } : company
+      )
+    );
+  };
+
+  // Save Conflict Resolutions
+  const saveConflictResolutions = async () => {
+    const db = getFirestore();
+    const batch = writeBatch(db);
+
+    try {
+      conflictingCompanies.forEach((company) => {
+        const companyRef = doc(db, 'müşteri listesi', company.id);
+        batch.update(companyRef, {
+          cariCode: (company.cariCode || '').trim(),
+        });
+      });
+
+      await batch.commit();
+
+      setSuccessMessage('Çakışan Cari Kodları başarıyla güncellendi.');
+      setAlertOpen(true);
+      setIsConflictModalOpen(false);
+      setConflictingCompanies([]);
+
+      // Proceed with updating the original customer
+      proceedWithUpdate();
+    } catch (error) {
+      console.error('Çakışan Cari Kodları güncellenirken hata oluştu:', error);
+      setError('Çakışan Cari Kodları güncellenirken bir hata oluştu.');
+      setAlertOpen(true);
+    }
+  };
+
+  // Cancel Conflict Resolution
+  const cancelConflictResolution = () => {
+    setIsConflictModalOpen(false);
+    setConflictingCompanies([]);
+  };
+
+  // Loading State
   if (loading) {
     return (
       <Container>
@@ -372,7 +511,7 @@ const MusteriListesi = () => {
     );
   }
 
-  // Hata Durumu
+  // Error State
   if (error && !selectedCustomer) {
     return (
       <Container>
@@ -395,7 +534,7 @@ const MusteriListesi = () => {
         Yeni Müşteri Ekle
       </Button>
 
-      {/* Onay Bekleyen Müşteriler */}
+      {/* Pending Customers */}
       <Typography variant="h5" gutterBottom style={{ marginTop: '20px' }}>
         Onay Bekleyen Müşteriler
       </Typography>
@@ -432,7 +571,7 @@ const MusteriListesi = () => {
         </Table>
       </TableContainerStyled>
 
-      {/* Onaylanmış Müşteriler */}
+      {/* Approved Customers */}
       <Typography variant="h5" gutterBottom style={{ marginTop: '20px' }}>
         Onaylanmış Müşteriler
       </Typography>
@@ -743,6 +882,62 @@ const MusteriListesi = () => {
             </Button>
           </Box>
         </ConfirmUpdateBox>
+      </Modal>
+
+      {/* Conflict Resolution Modal */}
+      <Modal
+        open={isConflictModalOpen}
+        onClose={cancelConflictResolution}
+      >
+        <ConflictResolutionBox>
+          <Typography variant="h6" gutterBottom>
+            Cari Kodu Çakışması
+          </Typography>
+          <Typography gutterBottom>
+            Yeni Cari Kodu "{editCariCode.trim()}" başka bir firma ile çakışıyor. Lütfen aşağıdaki firmaların Cari Kodlarını değiştirin.
+          </Typography>
+          <TableContainer component={Paper} style={{ marginTop: '20px' }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell style={{ width: '40%' }}>Cari Kodu</TableCell>
+                  <TableCell style={{ width: '60%' }}>Firma Adı</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {conflictingCompanies.map((company) => (
+                  <TableRow key={company.id}>
+                    <TableCell>
+                      <TextField
+                        label="Yeni Cari Kodu"
+                        value={company.cariCode}
+                        onChange={(e) => handleConflictChange(company.id, e.target.value)}
+                        fullWidth
+                      />
+                    </TableCell>
+                    <TableCell>{company['Müşteri Adı']}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <Box mt={3} display="flex" justifyContent="flex-end">
+            <Button
+              variant="contained"
+              onClick={cancelConflictResolution}
+            >
+              İptal
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={saveConflictResolutions}
+              style={{ marginLeft: '10px' }}
+            >
+              Kaydet ve Güncelle
+            </Button>
+          </Box>
+        </ConflictResolutionBox>
       </Modal>
 
       {/* Snackbar Alert */}

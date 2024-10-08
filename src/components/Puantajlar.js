@@ -61,27 +61,33 @@ const Puantajlar = () => {
         const customerSnapshot = await getDocs(collection(db, 'müşteri listesi'));
         const customerDataMap = {};
         const customerOptionsSet = new Set();
-
+    
         customerSnapshot.docs.forEach((doc) => {
           const data = doc.data();
           const customerName = data['Müşteri Adı'] || '';
           const cariCode = data['cariCode'] || '';
-
-          if (cariCode) {
+    
+          if (customerName) { // Ensure customerName is not empty
             customerDataMap[cariCode] = customerName;
-            const displayText = `${cariCode}/${customerName}`;
+            const displayText = `${customerName}/${cariCode}`;
             customerOptionsSet.add(displayText);
           }
         });
-
+    
         setCustomerMap(customerDataMap);
-
-        const customerOptionsArray = Array.from(customerOptionsSet).map((option) => ({
-          value: option,
-          label: option,
-        }));
-
-        setCustomerOptions(customerOptionsArray.sort((a, b) => a.label.localeCompare(b.label)));
+    
+        // **Updated:** Set `value` as `customerName`
+        const customerOptionsArray = Array.from(customerOptionsSet).map((option) => {
+          const [customerName, cariCode] = option.split('/');
+          return {
+            value: customerName, // Use customerName as the value
+            label: option,       // Display text remains as "Müşteri Adı/cariCode"
+          };
+        });
+    
+        setCustomerOptions(
+          customerOptionsArray.sort((a, b) => a.label.localeCompare(b.label))
+        );
       } catch (error) {
         console.error('Müşteri verileri alınırken hata oluştu:', error);
         setError('Müşteri verileri alınırken bir hata oluştu.');
@@ -157,33 +163,35 @@ const Puantajlar = () => {
         const pdfListRef = ref(storage, 'pdfs/');
         const pdfResult = await listAll(pdfListRef);
 
-        const merged = await Promise.all(pdfResult.items.map(async (itemRef) => {
-          const matchingPuantaj = puantajlarData.find(
-            (puantaj) => puantaj['Sözleşme Numarası'] === itemRef.name
-          );
+        const merged = await Promise.all(
+          pdfResult.items.map(async (itemRef) => {
+            const matchingPuantaj = puantajlarData.find(
+              (puantaj) => puantaj['Sözleşme Numarası'] === itemRef.name
+            );
 
-          let customerName = '-';
-          let cariCode = '-';
+            let customerName = '-';
+            let cariCode = '-';
 
-          if (matchingPuantaj) {
-            const puantajCariCode = (matchingPuantaj['Cari Kodu'] || '').trim();
-            if (puantajCariCode && customerMap[puantajCariCode]) {
-              customerName = customerMap[puantajCariCode];
-              cariCode = puantajCariCode;
-            } else {
-              customerName = matchingPuantaj['Müşteri Adı'] || '-';
-              cariCode = matchingPuantaj['Cari Kodu'] || '-';
+            if (matchingPuantaj) {
+              const puantajCariCode = (matchingPuantaj['Cari Kodu'] || '').trim();
+              if (puantajCariCode && customerMap[puantajCariCode]) {
+                customerName = customerMap[puantajCariCode];
+                cariCode = puantajCariCode;
+              } else {
+                customerName = matchingPuantaj['Müşteri Adı'] || '-';
+                cariCode = matchingPuantaj['Cari Kodu'] || '-';
+              }
             }
-          }
 
-          return {
-            pdfName: itemRef.name,
-            pdfRef: itemRef,
-            customerName: customerName,
-            cariCode: cariCode,
-            ...(matchingPuantaj || {}),
-          };
-        }));
+            return {
+              pdfName: itemRef.name,
+              pdfRef: itemRef,
+              customerName: customerName,
+              cariCode: cariCode,
+              ...(matchingPuantaj || {}),
+            };
+          })
+        );
 
         console.log("Birleştirilmiş veriler:", merged);
 
@@ -211,8 +219,8 @@ const Puantajlar = () => {
 
     if (selectedCustomers.length > 0) {
       filtered = filtered.filter((item) => {
-        const customerOption = `${item.cariCode}/${item.customerName}`;
-        return selectedCustomers.some((selected) => selected.value === customerOption);
+        const customerName = item.customerName;
+        return selectedCustomers.some((selected) => selected.value === customerName);
       });
     }
 
@@ -378,7 +386,8 @@ const Puantajlar = () => {
   const calculateTotalHours = useCallback(() => {
     let totalMinutes = 0;
 
-    filteredData.forEach((item) => {const start1 = formatTime(item['1. Başlangıç Saati']);
+    filteredData.forEach((item) => {
+      const start1 = formatTime(item['1. Başlangıç Saati']);
       const end1 = formatTime(item['1. Bitiş Saati']);
       const start2 = formatTime(item['2. Başlangıç Saati']);
       const end2 = formatTime(item['2. Bitiş Saati']);
@@ -610,8 +619,7 @@ const Puantajlar = () => {
                 <td>{renderWorkHours(item)}</td>
                 <td>{calculateTotalWorkDuration(item)}</td>
                 <td>{item['Tarih'] || '-'}</td>
-                <td>{item['Yetkili Adı'] || '-'}</td>
-                <td>{item['Çalışma Detayı'] || '-'}</td>
+                <td>{item['Yetkili Adı'] || '-'}</td>                <td>{item['Çalışma Detayı'] || '-'}</td>
               </tr>
             ))}
           </tbody>
