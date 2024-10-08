@@ -1,3 +1,5 @@
+/* Puantajlar.css */
+
 /* Temel stil değişkenleri */
 :root {
   --bg-color: #f9f9f9;
@@ -29,133 +31,102 @@
 
 /* Filter container */
 .filter-container {
+  background-color: #f0f8ff;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 30px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Filters row */
+.filters-row {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: flex-start;
+  gap: 20px;
   margin-bottom: 20px;
 }
 
-/* Left side filters */
-.left-filters {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex: 1;
-  max-width: 60%;
-}
-
-/* Right side buttons */
-.right-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  align-items: flex-end;
-  flex: 1;
-  max-width: 40%;
-}
-
 /* Tarih Filtresi */
-.date-filter {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
+.date-filter,
+.customer-filter,
+.machine-filter,
+.operator-filter {
+  flex: 1;
+  min-width: 200px;
 }
 
-.date-filter label {
-  color: white;
-  background: #007bff;
-  max-width: 150px;
+.date-filter label,
+.customer-filter label,
+.machine-filter label,
+.operator-filter label {
   display: block;
-  font-size: 14px;
-  margin-bottom: 5px;
-  padding: 5px;
-  border-radius: 3px;
+  margin-bottom: 8px;
+  font-weight: bold;
+  color: #333;
 }
 
 /* Tarih seçim kutuları için stil */
-.react-datepicker__input-container {
-  max-width: 150px;
-}
-
-/* Toplam saat hesaplama alanı */
-.total-hours {
+.date-pickers {
   display: flex;
-  justify-content: flex-end;
   gap: 10px;
-  margin-bottom: 15px;
 }
 
-.total-hours button {
-  padding: 8px 12px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 3px;
-  font-size: 14px;
-  cursor: pointer;
-  max-width: 200px;
+.react-datepicker-wrapper {
+  width: 100%;
 }
 
-.total-hours button:hover {
-  background-color: #0056b3;
-}
-
-.total-hours p {
-  background-color: #f0f0f0;
-  color: #333;
+.react-datepicker__input-container input {
+  width: 100%;
   padding: 8px;
-  border-radius: 5px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
   font-size: 14px;
-  margin: 0;
-  min-width: 150px;
-  text-align: center;
-  box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.1);
+  transition: border-color 0.3s ease;
 }
 
-/* Hakediş hesaplama alanı */
-.hakedis-calculate {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-bottom: 15px;
+.react-datepicker__input-container input:focus {
+  border-color: #007bff;
 }
 
-.hakedis-calculate button {
-  padding: 8px 12px;
+/* react-select özelleştirmeleri */
+.react-select__control {
+  border-color: var(--border-color);
+  box-shadow: none;
+  min-height: 38px;
+}
+
+.react-select__control:hover {
+  border-color: #007bff;
+}
+
+.react-select__control--is-focused {
+  border-color: #007bff;
+  box-shadow: 0 0 0 1px #007bff;
+}
+
+.react-select__multi-value {
   background-color: #007bff;
   color: white;
-  border: none;
-  border-radius: 3px;
-  font-size: 14px;
+}
+
+.react-select__multi-value__label {
+  color: white;
+}
+
+.react-select__multi-value__remove {
+  color: white;
   cursor: pointer;
-  max-width: 200px;
 }
 
-.hakedis-calculate button:hover {
-  background-color: #0056b3;
-}
-
-.hakedis-calculate p {
-  background-color: #007bff;
-  color: white;
-  padding: 8px;
-  border-radius: 3px;
-  font-size: 14px;
-  margin: 0;
-  min-width: 150px;
-  text-align: center;
-  box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.1);
+.react-select__menu {
+  z-index: 9999;
 }
 
 /* Buton Grubu */
 .button-group {
   display: flex;
-  justify-content: flex-start;
-  gap: 5px;
-  margin-bottom: 10px;
-  max-width: 250px;
-  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
 }
 
 .button-group button {
@@ -163,9 +134,10 @@
   background-color: #007bff;
   color: white;
   border: none;
-  border-radius: 3px;
+  border-radius: 4px;
   font-size: 14px;
   cursor: pointer;
+  transition: background-color 0.3s;
 }
 
 .button-group button:hover {
@@ -192,54 +164,49 @@
   background-color: #218838;
 }
 
-/* Müşteri, Makine ve Operatör Filtreleri */
-.customer-filter,
-.machine-filter,
-.operator-filter {
+/* Right Buttons */
+.right-buttons {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 5px;
-  margin-bottom: 10px;
-  max-width: 400px;
+  justify-content: flex-end;
+  gap: 20px;
+  margin-top: 20px;
 }
 
-.customer-filter label,
-.machine-filter label,
-.operator-filter label {
-  color: white;
-  background: #007bff;
-  max-width: 150px;
-  display: block;
-  font-size: 14px;
-  margin-bottom: 5px;
-  padding: 5px;
-  border-radius: 3px;
+.calculation-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.customer-filter select,
-.machine-filter select,
-.operator-filter select {
-  width: 100%;
+.calculation-row .result {
+  min-width: 150px;
   padding: 8px;
+  background-color: #e9ecef;
   border-radius: 4px;
   font-size: 14px;
-  outline: none;
-  transition: background-color 0.3s ease, color 0.3s ease;
-  max-width: 250px;
-  border: 1px solid var(--border-color);
+  text-align: center;
 }
 
-.customer-filter select:focus,
-.machine-filter select:focus,
-.operator-filter select:focus {
-  border-color: #007bff;
+.calculation-row button {
+  padding: 8px 12px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.calculation-row button:hover {
+  background-color: #218838;
 }
 
 /* Puantajlar Table */
 .puantajlar-table {
   width: 100%;
   border-collapse: collapse;
+  margin-top: 20px;
 }
 
 .puantajlar-table th,
@@ -304,6 +271,9 @@ input[type="checkbox"]:checked::before {
   transition: color 0.3s ease;
 }
 
+.link-button:hover {
+  color: #0056b3;
+}
 
 /* PDF Popup */
 .pdf-popup {
@@ -393,39 +363,40 @@ input[type="checkbox"]:checked::before {
   background-color: #c82333;
 }
 
-/* Calculation row */
-.calculation-row {
-  display: flex;
-  align-items: stretch;
-  /*align-items: center;*/
-  gap: 10px;
-  width: 50%;
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .filters-row {
+    flex-direction: column;
+  }
+
+  .date-filter,
+  .customer-filter,
+  .machine-filter,
+  .operator-filter {
+    width: 100%;
+  }
+
+  .right-buttons {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
-.calculation-row .result {
-  flex-grow: 1;
-  text-align: right;
-  margin: 0;
-  padding: 8px;
-  background-color: #f0f0f0;
-  border-radius: 5px;
-  min-width: 150px;
-  font-size: 14px;
-  color: #333;
-  box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.1);
-}
+@media (max-width: 768px) {
+  .puantajlar-container {
+    padding: 10px;
+  }
 
-.calculation-row button {
-  padding: 8px 12px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 3px;
-  font-size: 14px;
-  cursor: pointer;
-  white-space: nowrap;
-}
+  .filter-container {
+    padding: 15px;
+  }
 
-.calculation-row button:hover {
-  background-color: #0056b3;
+  .button-group {
+    flex-wrap: wrap;
+  }
+
+  .pdf-popup {
+    width: 95%;
+    height: 95%;
+  }
 }

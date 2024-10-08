@@ -7,6 +7,10 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  query,
+  where,
+  writeBatch,
+  onSnapshot,
 } from 'firebase/firestore';
 import {
   Container,
@@ -24,139 +28,148 @@ import {
   TextField,
   Snackbar,
   Alert,
-  IconButton,
+  Grid,
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import CloseIcon from '@mui/icons-material/Close';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 
+// Stiller
 const ModalBox = styled(Box)(({ theme }) => ({
-  position: 'relative', // Kapatma ikonunu konumlandırmak için relative yaptık
+  position: 'absolute',
   top: '50%',
   left: '50%',
   transform: 'translate(-50%, -50%)',
-  width: '90%',
-  maxWidth: 500,
-  maxHeight: '80vh', // Yüksekliği sınırladık
-  backgroundColor: theme.palette.background.paper,
-  borderRadius: 8,
+  width: 400,
+  backgroundColor: '#ffffff',
+  color: '#000000',
   boxShadow: theme.shadows[5],
-  padding: theme.spacing(2),
-  overflowY: 'auto', // Dikey kaydırma ekledik
+  padding: theme.spacing(2, 4, 3),
+  maxHeight: '80vh',
+  overflowY: 'auto',
+  border: '1px solid #ccc',
+}));
+
+const CompanyListBox = styled(Box)(({ theme }) => ({
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  width: 600,
+  backgroundColor: '#ffffff',
+  color: '#000000',
+  boxShadow: theme.shadows[5],
+  padding: theme.spacing(2, 4, 3),
+  maxHeight: '80vh',
+  overflowY: 'auto',
+  border: '1px solid #ccc',
+}));
+
+const ConfirmUpdateBox = styled(Box)(({ theme }) => ({
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  width: 500,
+  backgroundColor: '#ffffff',
+  color: '#000000',
+  boxShadow: theme.shadows[5],
+  padding: theme.spacing(3, 4, 4),
+  maxHeight: '80vh',
+  overflowY: 'auto',
+  border: '1px solid #ccc',
+}));
+
+const TableContainerStyled = styled(TableContainer)(({ theme }) => ({
+  '& .MuiTableCell-root': {
+    borderBottom: '1px solid #ccc',
+    borderRight: '1px solid #ccc',
+  },
+  '& .MuiTableCell-root:last-child': {
+    borderRight: 'none',
+  },
 }));
 
 const MusteriListesi = () => {
+  // Durum Değişkenleri
   const [approvedCustomers, setApprovedCustomers] = useState([]);
   const [pendingCustomers, setPendingCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [selectedCustomerList, setSelectedCustomerList] = useState('approved');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isCustomerSelectModalOpen, setIsCustomerSelectModalOpen] = useState(false);
+  const [isConfirmUpdateOpen, setIsConfirmUpdateOpen] = useState(false);
+  const [updateChanges, setUpdateChanges] = useState([]);
   const [successMessage, setSuccessMessage] = useState('');
   const [alertOpen, setAlertOpen] = useState(false);
 
-  // Yeni eklenen state değişkenleri
-  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
-  const [existingCustomer, setExistingCustomer] = useState(null);
-
-  // İki yeni arama sorgusu için state
-  const [customerNameSearchQuery, setCustomerNameSearchQuery] = useState('');
-  const [cariCodeSearchQuery, setCariCodeSearchQuery] = useState('');
-
-  // Edit form state'leri
+  // Edit Modal Alanları
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editEmail, setEditEmail] = useState('');
-  const [editCariCode, setEditCariCode] = useState(''); // Cari Kodu için state
+  const [editCariCode, setEditCariCode] = useState('');
 
-  // Yeni müşteri ekleme form state'leri
+  // Add Modal Alanları
   const [newCustomerName, setNewCustomerName] = useState('');
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [newCustomerEmail, setNewCustomerEmail] = useState('');
-  const [newCustomerCariCode, setNewCustomerCariCode] = useState(''); // Yeni müşteri için cari kod
+  const [newCustomerCariCode, setNewCustomerCariCode] = useState('');
 
-  // Silme işlemi için state
-  const [customerToDelete, setCustomerToDelete] = useState(null);
+  // Company List Modal ve Arama
+  const [isCompanyListModalOpen, setIsCompanyListModalOpen] = useState(false);
+  const [searchName, setSearchName] = useState('');
+  const [searchCariCode, setSearchCariCode] = useState('');
 
+  // Firestore Verilerini Dinleme
   useEffect(() => {
-    fetchCustomers();
+    const db = getFirestore();
+    const unsubscribe = onSnapshot(
+      collection(db, 'müşteri listesi'),
+      (snapshot) => {
+        const customerData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
+        const pending = customerData.filter(
+          (customer) => customer['Onay'] === 'Onay Bekliyor'
+        );
+        const approved = customerData.filter(
+          (customer) => customer['Onay'] !== 'Onay Bekliyor'
+        );
+
+        setPendingCustomers(pending);
+        setApprovedCustomers(approved);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Müşteri verileri alınırken hata oluştu:', error);
+        setError('Müşteri verileri alınırken bir hata oluştu.');
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
   }, []);
 
-  const fetchCustomers = async () => {
-    setLoading(true);
-    setError(null);
-    const db = getFirestore();
-    try {
-      const customerSnapshot = await getDocs(collection(db, 'müşteri listesi'));
-      const customerData = customerSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-
-      // Müşterileri kategorize et
-      const pending = [];
-      const approved = [];
-      customerData.forEach((customer) => {
-        if (customer['Onay'] === 'Onay Bekliyor') {
-          pending.push(customer);
-        } else {
-          approved.push(customer);
-        }
-      });
-
-      setPendingCustomers(pending);
-      setApprovedCustomers(approved);
-    } catch (error) {
-      console.error('Müşteri verileri alınırken bir hata oluştu:', error);
-      setError('Müşteri verileri alınırken bir hata oluştu.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Yeni müşteri ekleme fonksiyonu
+  // Yeni Müşteri Ekleme
   const handleAddNewCustomer = async () => {
-    if (!newCustomerName.trim()) {
-      setError('Müşteri adı gereklidir.');
+    if (!newCustomerName.trim() || !newCustomerCariCode.trim()) {
+      setError('Müşteri adı ve cari kodu gereklidir.');
       setAlertOpen(true);
       return;
     }
 
-    // Aynı isimli müşteri kontrolü
-    const allCustomers = [...approvedCustomers, ...pendingCustomers];
-    const duplicateCustomer = allCustomers.find(
-      (customer) => customer['Müşteri Adı'] === newCustomerName.trim()
-    );
-
-    if (duplicateCustomer) {
-      // Aynı isimli müşteri bulundu, uyarı göster
-      setExistingCustomer(duplicateCustomer);
-      setIsDuplicateModalOpen(true);
-      return;
-    }
-
     const db = getFirestore();
     try {
-      const newCustomerRef = await addDoc(collection(db, 'müşteri listesi'), {
-        'Müşteri Adı': newCustomerName,
-        Telefon: newCustomerPhone,
-        'E-posta': newCustomerEmail,
-        Onay: 'Onay Bekliyor',
-        cariCode: newCustomerCariCode.trim(), // Yeni müşteri için cari kod
-      });
-
-      const newCustomer = {
-        id: newCustomerRef.id,
-        'Müşteri Adı': newCustomerName,
-        Telefon: newCustomerPhone,
-        'E-posta': newCustomerEmail,
+      await addDoc(collection(db, 'müşteri listesi'), {
+        'Müşteri Adı': newCustomerName.trim(),
+        Telefon: newCustomerPhone.trim(),
+        'E-posta': newCustomerEmail.trim(),
         Onay: 'Onay Bekliyor',
         cariCode: newCustomerCariCode.trim(),
-      };
-      setPendingCustomers((prevCustomers) => [...prevCustomers, newCustomer]);
+      });
 
       setSuccessMessage('Yeni müşteri başarıyla eklendi.');
       setAlertOpen(true);
@@ -172,44 +185,100 @@ const MusteriListesi = () => {
     }
   };
 
-  // Mevcut müşteriyi güncelleme fonksiyonu
-  const handleConfirmUpdateExistingCustomer = async () => {
+  // Müşteri Güncelleme
+  const handleUpdateCustomer = () => {
+    if (!editName.trim() || !editCariCode.trim()) {
+      setError('Müşteri adı ve cari kodu gereklidir.');
+      setAlertOpen(true);
+      return;
+    }
+
+    // Değişiklikleri Belirleme
+    const changes = [];
+    if (editName.trim() !== selectedCustomer['Müşteri Adı']) {
+      changes.push({
+        field: 'Müşteri Adı',
+        old: selectedCustomer['Müşteri Adı'],
+        new: editName.trim(),
+      });
+    }
+    if (editPhone.trim() !== selectedCustomer['Telefon']) {
+      changes.push({
+        field: 'Telefon',
+        old: selectedCustomer['Telefon'],
+        new: editPhone.trim(),
+      });
+    }
+    if (editEmail.trim() !== selectedCustomer['E-posta']) {
+      changes.push({
+        field: 'E-posta',
+        old: selectedCustomer['E-posta'],
+        new: editEmail.trim(),
+      });
+    }
+    if (editCariCode.trim() !== selectedCustomer.cariCode) {
+      changes.push({
+        field: 'Cari Kodu',
+        old: selectedCustomer.cariCode,
+        new: editCariCode.trim(),
+      });
+    }
+
+    // Değişiklik kontrolünü kaldırarak güncellemeye izin verme
+    // Böylece, sadece 'Onay' durumu güncellendiğinde bile işlem başarılı olur
+    /*
+    if (changes.length === 0) {
+      setError('Değişiklik yapılmadı.');
+      setAlertOpen(true);
+      return;
+    }
+    */
+
+    // Değişiklikleri ayarlama ve onay dialogunu açma
+    setUpdateChanges(changes);
+    setIsConfirmUpdateOpen(true);
+  };
+
+  // Güncellemeyi Onaylama
+  const confirmUpdate = async () => {
+    setIsConfirmUpdateOpen(false); // Onay modalını kapatma
+
     const db = getFirestore();
     try {
-      const customerRef = doc(db, 'müşteri listesi', existingCustomer.id);
+      const oldCustomerName = selectedCustomer['Müşteri Adı'];
+      const oldCariCode = selectedCustomer.cariCode;
 
-      const updatedCustomer = {
-        Telefon: newCustomerPhone || existingCustomer.Telefon,
-        'E-posta': newCustomerEmail || existingCustomer['E-posta'],
-        cariCode: newCustomerCariCode || existingCustomer.cariCode,
-      };
+      // Müşteri belgesini güncelle
+      const customerRef = doc(db, 'müşteri listesi', selectedCustomer.id);
+      await updateDoc(customerRef, {
+        'Müşteri Adı': editName.trim(),
+        Telefon: editPhone.trim(),
+        'E-posta': editEmail.trim(),
+        cariCode: editCariCode.trim(),
+        Onay: 'Onaylandı', // Onay durumunu güncelleme
+      });
 
-      await updateDoc(customerRef, updatedCustomer);
+      // Puantajları güncelle
+      const puantajlarRef = collection(db, 'puantajlar');
+      const q = query(puantajlarRef, where('Müşteri Adı', '==', oldCustomerName));
+      const puantajlarSnapshot = await getDocs(q);
 
-      // State güncelleme
-      if (existingCustomer.Onay === 'Onay Bekliyor') {
-        setPendingCustomers((prevCustomers) =>
-          prevCustomers.map((cust) =>
-            cust.id === existingCustomer.id ? { ...cust, ...updatedCustomer } : cust
-          )
-        );
-      } else {
-        setApprovedCustomers((prevCustomers) =>
-          prevCustomers.map((cust) =>
-            cust.id === existingCustomer.id ? { ...cust, ...updatedCustomer } : cust
-          )
-        );
-      }
+      const batch = writeBatch(db);
+      puantajlarSnapshot.forEach((puantajDoc) => {
+        batch.update(puantajDoc.ref, {
+          'Müşteri Adı': editName.trim(),
+          'Cari Kodu': editCariCode.trim(),
+        });
+      });
+      await batch.commit();
 
-      setSuccessMessage('Mevcut müşteri başarıyla güncellendi.');
+      console.log(`${puantajlarSnapshot.size} puantaj kaydı güncellendi.`);
+
+      setSuccessMessage('Müşteri başarıyla güncellendi.');
       setAlertOpen(true);
-      setIsDuplicateModalOpen(false);
-      setIsAddModalOpen(false);
-      setExistingCustomer(null);
-      setNewCustomerName('');
-      setNewCustomerPhone('');
-      setNewCustomerEmail('');
-      setNewCustomerCariCode('');
+      setIsEditModalOpen(false);
+      setSelectedCustomer(null);
+      setUpdateChanges([]);
     } catch (error) {
       console.error('Müşteri güncellenirken bir hata oluştu:', error);
       setError('Müşteri güncellenirken bir hata oluştu.');
@@ -217,33 +286,41 @@ const MusteriListesi = () => {
     }
   };
 
-  // Mevcut müşteriyi güncelleme işlemini iptal etme fonksiyonu
-  const handleCancelUpdateExistingCustomer = () => {
-    setIsDuplicateModalOpen(false);
-    setExistingCustomer(null);
+  // Güncellemeyi İptal Etme
+  const cancelUpdate = () => {
+    setIsConfirmUpdateOpen(false);
+    setUpdateChanges([]);
   };
 
-  // Müşteri silme fonksiyonu
+  // Müşteri Silme
   const handleDeleteCustomer = async () => {
-    if (!customerToDelete) return;
+    if (!selectedCustomer) return;
+
     const db = getFirestore();
     try {
-      await deleteDoc(doc(db, 'müşteri listesi', customerToDelete.id));
+      await deleteDoc(doc(db, 'müşteri listesi', selectedCustomer.id));
 
-      if (selectedCustomerList === 'approved') {
-        setApprovedCustomers((prevCustomers) =>
-          prevCustomers.filter((cust) => cust.id !== customerToDelete.id)
-        );
-      } else if (selectedCustomerList === 'pending') {
-        setPendingCustomers((prevCustomers) =>
-          prevCustomers.filter((cust) => cust.id !== customerToDelete.id)
-        );
-      }
+      // Puantajlardaki müşteri bilgilerini güncelle
+      const puantajlarRef = collection(db, 'puantajlar');
+      const q = query(
+        puantajlarRef,
+        where('Cari Kodu', '==', selectedCustomer.cariCode)
+      );
+      const puantajlarSnapshot = await getDocs(q);
+
+      const batch = writeBatch(db);
+      puantajlarSnapshot.forEach((puantajDoc) => {
+        batch.update(puantajDoc.ref, {
+          'Müşteri Adı': 'Silinmiş Müşteri',
+          'Cari Kodu': '',
+        });
+      });
+      await batch.commit();
 
       setSuccessMessage('Müşteri başarıyla silindi.');
       setAlertOpen(true);
       setIsDeleteModalOpen(false);
-      setCustomerToDelete(null);
+      setSelectedCustomer(null);
     } catch (error) {
       console.error('Müşteri silinirken bir hata oluştu:', error);
       setError('Müşteri silinirken bir hata oluştu.');
@@ -251,504 +328,211 @@ const MusteriListesi = () => {
     }
   };
 
-  // Silme modalını açma fonksiyonu
-  const openDeleteModal = (customer, listType) => {
-    setCustomerToDelete(customer);
-    setSelectedCustomerList(listType);
-    setIsDeleteModalOpen(true);
-  };
-
-  // Edit modalını açma fonksiyonu
-  const openEditModal = (customer, listType) => {
+  // Düzenleme Modalını Açma
+  const openEditModal = (customer) => {
     setSelectedCustomer(customer);
-    setSelectedCustomerList(listType);
-    setEditName(customer?.['Müşteri Adı'] || '');
-    setEditPhone(customer?.['Telefon'] || '');
-    setEditEmail(customer?.['E-posta'] || '');
-    setEditCariCode(customer?.cariCode || ''); // Cari Kodu state'ini ayarla
+    setEditName(customer['Müşteri Adı']);
+    setEditPhone(customer['Telefon']);
+    setEditEmail(customer['E-posta']);
+    setEditCariCode(customer['cariCode']);
     setIsEditModalOpen(true);
   };
 
-  // Müşteri güncelleme ve onaylama fonksiyonu
-  const handleUpdateCustomer = async () => {
-    if (!editName.trim()) {
-      setError('Müşteri adı gereklidir.');
-      setAlertOpen(true);
-      return;
-    }
-    const db = getFirestore();
-    try {
-      const customerRef = doc(db, 'müşteri listesi', selectedCustomer.id);
-
-      // Eğer müşteri "pending" listesindeyse, Onay durumunu güncelle
-      let updatedCustomer = {
-        'Müşteri Adı': editName,
-        Telefon: editPhone,
-        'E-posta': editEmail,
-        cariCode: editCariCode.trim(),
-      };
-
-      if (selectedCustomerList === 'pending') {
-        updatedCustomer.Onay = 'Onaylandı';
-      }
-
-      await updateDoc(customerRef, updatedCustomer);
-
-      if (selectedCustomerList === 'approved') {
-        setApprovedCustomers((prevCustomers) =>
-          prevCustomers.map((cust) =>
-            cust.id === selectedCustomer.id ? { ...cust, ...updatedCustomer } : cust
-          )
-        );
-      } else if (selectedCustomerList === 'pending') {
-        // Müşteriyi pending listesinden çıkar
-        setPendingCustomers((prevCustomers) =>
-          prevCustomers.filter((cust) => cust.id !== selectedCustomer.id)
-        );
-        // Müşteriyi approved listesine ekle
-        setApprovedCustomers((prevCustomers) => [
-          ...prevCustomers,
-          { id: selectedCustomer.id, ...updatedCustomer },
-        ]);
-      }
-
-      setSuccessMessage('Müşteri başarıyla güncellendi ve onaylandı.');
-      setAlertOpen(true);
-      setIsEditModalOpen(false);
-      setSelectedCustomer(null);
-    } catch (error) {
-      console.error('Müşteri güncellenirken bir hata oluştu:', error);
-      setError('Müşteri güncellenirken bir hata oluştu.');
-      setAlertOpen(true);
-    }
+  // Firma Seçimi
+  const handleCompanySelect = (company) => {
+    setEditName(company['Müşteri Adı']);
+    setEditCariCode(company['cariCode']);
+    setIsCompanyListModalOpen(false);
   };
 
-  // Mevcut müşteri seçimi fonksiyonu
-  const handleSelectExistingCustomer = (customer) => {
-    setEditName(customer?.['Müşteri Adı'] || '');
-    setEditPhone(customer?.['Telefon'] || '');
-    setEditEmail(customer?.['E-posta'] || '');
-    setEditCariCode(customer?.cariCode || '');
-    setIsCustomerSelectModalOpen(false);
-  };
-
-  // Arama sorgusu değiştiğinde çalışan fonksiyonlar
-  const handleCustomerNameSearchChange = (e) => {
-    setCustomerNameSearchQuery(e.target.value);
-  };
-
-  const handleCariCodeSearchChange = (e) => {
-    setCariCodeSearchQuery(e.target.value);
-  };
-
-  // Arama sorgularına göre filtrelenmiş onaylanmış müşteriler
-  const filteredApprovedCustomers = approvedCustomers.filter((customer) => {
-    const nameLower = (customer['Müşteri Adı'] || '').toLowerCase();
-    const codeLower = (customer.cariCode || '').toLowerCase();
-    const nameQueryLower = customerNameSearchQuery.toLowerCase();
-    const codeQueryLower = cariCodeSearchQuery.toLowerCase();
-
-    const nameMatches = nameLower.includes(nameQueryLower);
-    const codeMatches = codeLower.includes(codeQueryLower);
-
-    // Her iki arama alanı da boşsa tüm müşterileri göster
-    if (!nameQueryLower && !codeQueryLower) {
-      return true;
-    }
-
-    // Sadece müşteri adı araması yapılmışsa
-    if (nameQueryLower && !codeQueryLower) {
-      return nameMatches;
-    }
-
-    // Sadece cari kodu araması yapılmışsa
-    if (!nameQueryLower && codeQueryLower) {
-      return codeMatches;
-    }
-
-    // Her iki arama alanı da doluysa, her ikisi de eşleşmeli
-    return nameMatches && codeMatches;
-  });
-
-  // Alert kapatma fonksiyonu
+  // Alert Kapatma
   const handleCloseAlert = () => {
     setAlertOpen(false);
     setError(null);
     setSuccessMessage('');
   };
 
-  // Yükleme durumu için dönen JSX
+  // Filtrelenmiş Firmaları Alma
+  const filteredCompanies = approvedCustomers.filter(
+    (company) =>
+      company['Müşteri Adı']
+        .toLowerCase()
+        .includes(searchName.toLowerCase()) &&
+      company['cariCode']
+        .toLowerCase()
+        .includes(searchCariCode.toLowerCase())
+  );
+
+  // Yükleniyor Durumu
   if (loading) {
     return (
-      <Container sx={{ paddingTop: 4 }}>
-        <Typography variant="h6">Yükleniyor...</Typography>
+      <Container>
+        <Typography>Yükleniyor...</Typography>
+      </Container>
+    );
+  }
+
+  // Hata Durumu
+  if (error && !selectedCustomer) {
+    return (
+      <Container>
+        <Typography color="error">{error}</Typography>
       </Container>
     );
   }
 
   return (
-    <Container sx={{ paddingTop: 4 }}>
-      {/* Onay Bekleyen Firma Listesi */}
-      <Typography variant="h5" gutterBottom>
-        Onay Bekleyen Firma Listesi
+    <Container>
+      <Typography variant="h4" gutterBottom>
+        Müşteri Listesi
       </Typography>
-      <TableContainer component={Paper}>
-        <Table aria-label="pending customers">
+
+      <Button
+        variant="contained"
+        color="primary"
+        onClick={() => setIsAddModalOpen(true)}
+      >
+        Yeni Müşteri Ekle
+      </Button>
+
+      {/* Onay Bekleyen Müşteriler */}
+      <Typography variant="h5" gutterBottom style={{ marginTop: '20px' }}>
+        Onay Bekleyen Müşteriler
+      </Typography>
+      <TableContainerStyled component={Paper}>
+        <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Firma Adı</TableCell>
-              <TableCell>Telefon</TableCell>
-              <TableCell>E-posta</TableCell>
-              <TableCell>Cari Kodu</TableCell>
-              <TableCell align="center">İşlemler</TableCell>
+              <TableCell style={{ width: '20%' }}>Müşteri Adı</TableCell>
+              <TableCell style={{ width: '20%' }}>Telefon</TableCell>
+              <TableCell style={{ width: '20%' }}>E-posta</TableCell>
+              <TableCell style={{ width: '20%' }}>Cari Kodu</TableCell>
+              <TableCell style={{ width: '20%' }}>İşlemler</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {pendingCustomers.map((customer) => (
               <TableRow key={customer.id}>
-                <TableCell>{customer?.['Müşteri Adı'] || '-'}</TableCell>
-                <TableCell>{customer?.['Telefon'] || '-'}</TableCell>
-                <TableCell>{customer?.['E-posta'] || '-'}</TableCell>
-                <TableCell>{customer?.cariCode || '-'}</TableCell>
-                <TableCell align="center">
+                <TableCell>{customer['Müşteri Adı']}</TableCell>
+                <TableCell>{customer['Telefon']}</TableCell>
+                <TableCell>{customer['E-posta']}</TableCell>
+                <TableCell>{customer['cariCode']}</TableCell>
+                <TableCell>
                   <Button
-                    variant="contained"
+                    variant="outlined"
                     color="primary"
-                    onClick={() => openEditModal(customer, 'pending')}
+                    onClick={() => openEditModal(customer)}
                   >
-                    Cari Tanımla
+                    Düzenle
                   </Button>
                 </TableCell>
               </TableRow>
             ))}
-            {pendingCustomers.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={5} align="center">
-                  Onay bekleyen Firma bulunmamaktadır.
-                </TableCell>
-              </TableRow>
-            )}
           </TableBody>
         </Table>
-      </TableContainer>
+      </TableContainerStyled>
 
-      {/* Onaylanmış Firma Listesi */}
-      <Typography variant="h5" gutterBottom sx={{ marginTop: 4 }}>
-        Firma Listesi
+      {/* Onaylanmış Müşteriler */}
+      <Typography variant="h5" gutterBottom style={{ marginTop: '20px' }}>
+        Onaylanmış Müşteriler
       </Typography>
-      <Button
-        variant="contained"
-        color="primary"
-        onClick={() => setIsAddModalOpen(true)}
-        sx={{ marginBottom: 2 }}
-      >
-        Yeni Firma Ekle
-      </Button>
-      <TableContainer component={Paper}>
-        <Table aria-label="approved customers">
+      <TableContainerStyled component={Paper}>
+        <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Firma Adı</TableCell>
-              <TableCell>Telefon</TableCell>
-              <TableCell>E-posta</TableCell>
-              <TableCell>Cari Kodu</TableCell>
-              <TableCell align="center">İşlemler</TableCell>
+              <TableCell style={{ width: '20%' }}>Müşteri Adı</TableCell>
+              <TableCell style={{ width: '20%' }}>Telefon</TableCell>
+              <TableCell style={{ width: '20%' }}>E-posta</TableCell>
+              <TableCell style={{ width: '20%' }}>Cari Kodu</TableCell>
+              <TableCell style={{ width: '20%' }}>İşlemler</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {approvedCustomers.map((customer) => (
               <TableRow key={customer.id}>
-                <TableCell>{customer?.['Müşteri Adı'] || '-'}</TableCell>
-                <TableCell>{customer?.['Telefon'] || '-'}</TableCell>
-                <TableCell>{customer?.['E-posta'] || '-'}</TableCell>
-                <TableCell>{customer?.cariCode || '-'}</TableCell>
-                <TableCell align="center">
+                <TableCell>{customer['Müşteri Adı']}</TableCell>
+                <TableCell>{customer['Telefon']}</TableCell>
+                <TableCell>{customer['E-posta']}</TableCell>
+                <TableCell>{customer['cariCode']}</TableCell>
+                <TableCell>
                   <Button
-                    variant="contained"
+                    variant="outlined"
                     color="primary"
-                    onClick={() => openEditModal(customer, 'approved')}
-                    sx={{ marginRight: 1 }}
+                    onClick={() => openEditModal(customer)}
                   >
-                    Cari Tanımla
+                    Düzenle
                   </Button>
                   <Button
-                    variant="contained"
-                    color="error"
-                    onClick={() => openDeleteModal(customer, 'approved')}
+                    variant="outlined"
+                    color="secondary"
+                    onClick={() => {
+                      setSelectedCustomer(customer);
+                      setIsDeleteModalOpen(true);
+                    }}
+                    style={{ marginLeft: '10px' }}
                   >
                     Sil
                   </Button>
                 </TableCell>
               </TableRow>
             ))}
-            {approvedCustomers.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={5} align="center">
-                  Firma bulunmamaktadır.
-                </TableCell>
-              </TableRow>
-            )}
           </TableBody>
         </Table>
-      </TableContainer>
+      </TableContainerStyled>
 
-      {/* Düzenleme Modal'ı */}
-      <Modal open={isEditModalOpen} onClose={() => setIsEditModalOpen(false)}>
-        <ModalBox>
-          <Typography variant="h6" gutterBottom>
-            Firma Bilgilerini Cari Tanımla
-          </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', marginTop: 2 }}>
-            <TextField
-              label="Firma Adı"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              fullWidth
-              margin="normal"
-              required
-            />
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => setIsCustomerSelectModalOpen(true)}
-              sx={{ marginLeft: 1, marginTop: 2 }}
-            >
-              Seç
-            </Button>
-          </Box>
-          <TextField
-            label="Telefon"
-            value={editPhone}
-            onChange={(e) => setEditPhone(e.target.value)}
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            label="E-posta"
-            value={editEmail}
-            onChange={(e) => setEditEmail(e.target.value)}
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            label="Cari Kodu"
-            value={editCariCode}
-            onChange={(e) => setEditCariCode(e.target.value)}
-            fullWidth
-            margin="normal"
-          />
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, marginTop: 2 }}>
-            {/* Butonların yerini değiştirdik */}
-            <Button
-              variant="outlined"
-              color="secondary"
-              onClick={() => setIsEditModalOpen(false)}
-            >
-              İptal
-            </Button>
-            <Button variant="contained" color="primary" onClick={handleUpdateCustomer}>
-              Kaydet
-            </Button>
-            {selectedCustomerList === 'approved' && (
-              <Button
-                variant="contained"
-                color="error"
-                onClick={() => openDeleteModal(selectedCustomer, selectedCustomerList)}
-              >
-                Sil
-              </Button>
-            )}
-          </Box>
-        </ModalBox>
-      </Modal>
-
-      {/* Firma Seçim Modal'ı */}
+      {/* Edit Modal */}
       <Modal
-        open={isCustomerSelectModalOpen}
-        onClose={() => setIsCustomerSelectModalOpen(false)}
+        open={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
       >
         <ModalBox>
-          {/* Kapatma ikonu eklendi */}
-          <IconButton
-            aria-label="close"
-            onClick={() => setIsCustomerSelectModalOpen(false)}
-            sx={{
-              position: 'absolute',
-              right: 8,
-              top: 8,
-            }}
-          >
-            <CloseIcon />
-          </IconButton>
           <Typography variant="h6" gutterBottom>
-            Firma Seç
+            Müşteri Düzenle
           </Typography>
-          <Box sx={{ display: 'flex', gap: 2, marginBottom: 2 }}>
+          <Box display="flex" alignItems="center" mb={2}>
             <TextField
-              label="Müşteri Adı Ara"
-              value={customerNameSearchQuery}
-              onChange={handleCustomerNameSearchChange}
+              label="Müşteri Adı"
               fullWidth
-              placeholder="Müşteri adına göre ara"
+              margin="normal"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              style={{ flex: 0.9 }}
             />
-            <TextField
-              label="Cari Kodu Ara"
-              value={cariCodeSearchQuery}
-              onChange={handleCariCodeSearchChange}
-              fullWidth
-              placeholder="Cari koduna göre ara"
-            />
-          </Box>
-          <TableContainer component={Paper}>
-            <Table aria-label="customer selection" size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Firma Adı</TableCell>
-                  <TableCell>Cari Kodu</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredApprovedCustomers.map((customer) => (
-                  <TableRow
-                    key={customer.id}
-                    hover
-                    onClick={() => handleSelectExistingCustomer(customer)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <TableCell>{customer?.['Müşteri Adı'] || '-'}</TableCell>
-                    <TableCell>{customer?.cariCode || '-'}</TableCell>
-                  </TableRow>
-                ))}
-                {filteredApprovedCustomers.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={2} align="center">
-                      Aramanıza uygun firma bulunamadı.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          {/* "İptal" butonunu sağ tarafa aldık */}
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2 }}>
             <Button
-              variant="outlined"
-              color="secondary"
-              onClick={() => setIsCustomerSelectModalOpen(false)}
+              onClick={() => setIsCompanyListModalOpen(true)}
+              style={{ flex: 0.1, marginLeft: '10px' }}
+              variant="contained"
+              color="default"
             >
-              İptal
+              <ArrowDropDownIcon />
             </Button>
           </Box>
-        </ModalBox>
-      </Modal>
-
-      {/* Silme Doğrulama Modal'ı */}
-      <Modal open={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)}>
-        <ModalBox>
-          <Typography variant="h6" gutterBottom>
-            Firmayı Sil
-          </Typography>
-          <Typography gutterBottom>
-            Bu firmayı silmek istediğinizden emin misiniz?
-          </Typography>
-          <Typography>
-            <strong>Firma Adı:</strong> {customerToDelete?.['Müşteri Adı']}
-          </Typography>
-          <Typography>
-            <strong>Telefon:</strong> {customerToDelete?.['Telefon']}
-          </Typography>
-          <Typography>
-            <strong>E-posta:</strong> {customerToDelete?.['E-posta']}
-          </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, marginTop: 2 }}>
-            {/* Butonların yerini değiştirdik */}
-            <Button
-              variant="outlined"
-              color="secondary"
-              onClick={() => setIsDeleteModalOpen(false)}
-            >
-              İptal
-            </Button>
-            <Button variant="contained" color="error" onClick={handleDeleteCustomer}>
-              Sil
-            </Button>
-          </Box>
-        </ModalBox>
-      </Modal>
-
-      {/* Yeni Müşteri Ekle Modal'ı */}
-      <Modal open={isAddModalOpen} onClose={() => setIsAddModalOpen(false)}>
-        <ModalBox>
-          <Typography variant="h6" gutterBottom>
-            Yeni Firma Ekle
-          </Typography>
-          <TextField
-            label="Müşteri Adı"
-            value={newCustomerName}
-            onChange={(e) => setNewCustomerName(e.target.value)}
-            fullWidth
-            margin="normal"
-            required
-          />
           <TextField
             label="Telefon"
-            value={newCustomerPhone}
-            onChange={(e) => setNewCustomerPhone(e.target.value)}
             fullWidth
             margin="normal"
+            value={editPhone}
+            onChange={(e) => setEditPhone(e.target.value)}
           />
           <TextField
             label="E-posta"
-            value={newCustomerEmail}
-            onChange={(e) => setNewCustomerEmail(e.target.value)}
             fullWidth
             margin="normal"
+            value={editEmail}
+            onChange={(e) => setEditEmail(e.target.value)}
           />
           <TextField
             label="Cari Kodu"
-            value={newCustomerCariCode}
-            onChange={(e) => setNewCustomerCariCode(e.target.value)}
             fullWidth
             margin="normal"
+            value={editCariCode}
+            onChange={(e) => setEditCariCode(e.target.value)}
           />
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, marginTop: 2 }}>
-            {/* Butonların yerini değiştirdik */}
-            <Button
-              variant="outlined"
-              color="secondary"
-              onClick={() => setIsAddModalOpen(false)}
-            >
-              İptal
-            </Button>
-            <Button variant="contained" color="primary" onClick={handleAddNewCustomer}>
-              Kaydet
-            </Button>
-          </Box>
-        </ModalBox>
-      </Modal>
-
-      {/* Duplicate Uyarı Modal'ı */}
-      <Modal open={isDuplicateModalOpen} onClose={handleCancelUpdateExistingCustomer}>
-        <ModalBox>
-          <Typography variant="h6" gutterBottom>
-            Müşteri Zaten Mevcut
-          </Typography>
-          <Typography>
-            "{newCustomerName}" isimli bir müşteri zaten mevcut. Bu müşterinin bilgilerini
-            güncellemek ister misiniz?
-          </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, marginTop: 2 }}>
-            <Button
-              variant="outlined"
-              color="secondary"
-              onClick={handleCancelUpdateExistingCustomer}
-            >
-              İptal
-            </Button>
+          <Box mt={2} display="flex" justifyContent="flex-end">
             <Button
               variant="contained"
               color="primary"
-              onClick={handleConfirmUpdateExistingCustomer}
+              onClick={handleUpdateCustomer}
             >
               Güncelle
             </Button>
@@ -756,22 +540,224 @@ const MusteriListesi = () => {
         </ModalBox>
       </Modal>
 
-      {/* Başarı ve Hata Mesajları */}
+      {/* Add Modal */}
+      <Modal
+        open={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+      >
+        <ModalBox>
+          <Typography variant="h6" gutterBottom>
+            Yeni Müşteri Ekle
+          </Typography>
+          <TextField
+            label="Müşteri Adı"
+            fullWidth
+            margin="normal"
+            value={newCustomerName}
+            onChange={(e) => setNewCustomerName(e.target.value)}
+          />
+          <TextField
+            label="Telefon"
+            fullWidth
+            margin="normal"
+            value={newCustomerPhone}
+            onChange={(e) => setNewCustomerPhone(e.target.value)}
+          />
+          <TextField
+            label="E-posta"
+            fullWidth
+            margin="normal"
+            value={newCustomerEmail}
+            onChange={(e) => setNewCustomerEmail(e.target.value)}
+          />
+          <TextField
+            label="Cari Kodu"
+            fullWidth
+            margin="normal"
+            value={newCustomerCariCode}
+            onChange={(e) => setNewCustomerCariCode(e.target.value)}
+          />
+          <Box mt={2} display="flex" justifyContent="flex-end">
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleAddNewCustomer}
+            >
+              Ekle
+            </Button>
+          </Box>
+        </ModalBox>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        open={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+      >
+        <ModalBox>
+          <Typography variant="h6" gutterBottom>
+            Müşteriyi Sil
+          </Typography>
+          {selectedCustomer && (
+            <Box mb={2}>
+              <Typography>
+                <strong>Müşteri Adı:</strong> {selectedCustomer['Müşteri Adı']}
+              </Typography>
+              <Typography>
+                <strong>Telefon:</strong> {selectedCustomer['Telefon']}
+              </Typography>
+              <Typography>
+                <strong>E-posta:</strong> {selectedCustomer['E-posta']}
+              </Typography>
+              <Typography>
+                <strong>Cari Kodu:</strong> {selectedCustomer['cariCode']}
+              </Typography>
+            </Box>
+          )}
+          <Typography color="error" mb={2}>
+            Bu müşteriyi silerseniz, ilgili puantaj verileri de kaybolacaktır. Devam etmek istediğinize emin misiniz?
+          </Typography>
+          <Box mt={2} display="flex" justifyContent="flex-end">
+            <Button
+              variant="contained"
+              color="secondary"
+              onClick={handleDeleteCustomer}
+              style={{ marginRight: '10px' }}
+            >
+              Sil
+            </Button>
+            <Button
+              variant="contained"
+              onClick={() => setIsDeleteModalOpen(false)}
+            >
+              İptal
+            </Button>
+          </Box>
+        </ModalBox>
+      </Modal>
+
+      {/* Company List Modal */}
+      <Modal
+        open={isCompanyListModalOpen}
+        onClose={() => setIsCompanyListModalOpen(false)}
+      >
+        <CompanyListBox>
+          <Typography variant="h6" gutterBottom>
+            Firma Listesi
+          </Typography>
+          <Grid container spacing={2} mb={2}>
+            <Grid item xs={6}>
+              <TextField
+                label="Cari Kodu Ara"
+                fullWidth
+                margin="normal"
+                value={searchCariCode}
+                onChange={(e) => setSearchCariCode(e.target.value)}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                label="Firma Adı Ara"
+                fullWidth
+                margin="normal"
+                value={searchName}
+                onChange={(e) => setSearchName(e.target.value)}
+              />
+            </Grid>
+          </Grid>
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell style={{ width: '50%' }}>Cari Kodu</TableCell>
+                  <TableCell style={{ width: '50%' }}>Firma Adı</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredCompanies.length > 0 ? (
+                  filteredCompanies.map((company) => (
+                    <TableRow
+                      key={company.id}
+                      hover
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => handleCompanySelect(company)}
+                    >
+                      <TableCell>{company['cariCode']}</TableCell>
+                      <TableCell>{company['Müşteri Adı']}</TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={2} align="center">
+                      Sonuç bulunamadı.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <Box mt={2} display="flex" justifyContent="flex-end">
+            <Button
+              variant="contained"
+              onClick={() => setIsCompanyListModalOpen(false)}
+            >
+              Kapat
+            </Button>
+          </Box>
+        </CompanyListBox>
+      </Modal>
+
+      {/* Confirm Update Modal */}
+      <Modal
+        open={isConfirmUpdateOpen}
+        onClose={cancelUpdate}
+      >
+        <ConfirmUpdateBox>
+          <Typography variant="h6" gutterBottom>
+            Değişiklikleri Onayla
+          </Typography>
+          <Typography>
+            Yapılan değişiklikler aşağıda özetlenmiştir. Değişikliklerden emin misiniz?
+          </Typography>
+          <Box mt={2}>
+            {updateChanges.map((change, index) => (
+              <Typography key={index}>
+                <strong>{change.field}:</strong> "{change.old}" yerine "{change.new}" olarak değiştirildi.
+              </Typography>
+            ))}
+          </Box>
+          <Box mt={3} display="flex" justifyContent="flex-end">
+            <Button
+              variant="contained"
+              onClick={cancelUpdate}
+            >
+              Hayır
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={confirmUpdate}
+              style={{ marginLeft: '10px' }}
+            >
+              Evet
+            </Button>
+          </Box>
+        </ConfirmUpdateBox>
+      </Modal>
+
+      {/* Snackbar Alert */}
       <Snackbar
         open={alertOpen}
-        autoHideDuration={3000}
+        autoHideDuration={6000}
         onClose={handleCloseAlert}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        {successMessage ? (
-          <Alert onClose={handleCloseAlert} severity="success" variant="filled">
-            {successMessage}
-          </Alert>
-        ) : error ? (
-          <Alert onClose={handleCloseAlert} severity="error" variant="filled">
-            {error}
-          </Alert>
-        ) : null}
+        <Alert
+          onClose={handleCloseAlert}
+          severity={error ? 'error' : 'success'}
+          sx={{ width: '100%' }}
+        >
+          {error || successMessage}
+        </Alert>
       </Snackbar>
     </Container>
   );

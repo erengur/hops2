@@ -1,7 +1,9 @@
 // firebaseConfig.js
+// firebaseConfig.js
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth'; // Firebase Authentication için
 import { getFirestore } from 'firebase/firestore'; // Firestore veritabanı için
+import { getStorage } from 'firebase/storage'; // Firebase Storage için
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -17,8 +19,9 @@ const firebaseConfig = {
 // Firebase uygulamasını başlatma
 const app = initializeApp(firebaseConfig);
 
-// Authentication ve Firestore'u başlatma
+// Authentication, Firestore ve Storage'ı başlatma
 const auth = getAuth(app);
 const database = getFirestore(app);
+const storage = getStorage(app);
 
-export { auth, database };
+export { auth, database, storage };

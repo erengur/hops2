@@ -1,139 +1,118 @@
 /* Genel düzenlemeler */
 .musteri-listesi-container {
-  padding: 20px;
-  border-radius: 10px;
+  padding: 30px;
+  border-radius: 15px;
   max-width: 1200px;
   margin: 0 auto;
-  background-color: #f4f4f9;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, #f0f0f0, #e6e6e6);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  font-family: 'Roboto', sans-serif;
 }
 
-/* Tablo genel stili */
-.musteri-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 30px; /* Tablolar arasında boşluk */
-  background-color: #ffffff;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+/* Arama alanı */
+.search-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
 }
 
-.musteri-table th,
-.musteri-table td {
-  padding: 15px 20px;
-  text-align: left;
-  border-bottom: 1px solid #ddd;
+.search-input {
+  flex: 1;
+  padding: 12px;
+  margin-right: 15px;
+  border: 1px solid #aaa;
+  border-radius: 6px;
   font-size: 16px;
+  font-family: 'Roboto', sans-serif;
+  transition: border-color 0.3s;
+}
+
+.search-input:focus {
+  border-color: #28a745;
+  outline: none;
+  box-shadow: 0 0 8px rgba(40, 167, 69, 0.5);
+}
+
+/* Liste görünümü */
+.customer-list {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 15px;
+}
+
+.customer-item-header, .customer-item-row {
+  border-bottom: 1px solid #bbb;
+}
+
+.customer-item-header {
+  background-color: #d9d9d9;
+  font-weight: bold;
+  text-align: left;
   color: #333;
 }
 
-/* Tablo başlıkları */
-.musteri-table th {
-  background-color: #f5f5f5;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.customer-item-row:hover {
+  background-color: #e0e0e0;
+  transition: background-color 0.3s;
 }
 
-/* Tablo satırları */
-.musteri-table tr {
-  transition: background-color 0.3s ease;
+.customer-item-row:nth-child(even) {
+  background-color: #f8f8f8;
 }
 
-.musteri-table tr:hover {
-  background-color: #f1f1f1;
+.customer-info {
+  padding: 12px;
+  text-align: left;
 }
 
-/* Light Theme */
-.light .musteri-listesi-container {
-  background-color: #f9f9f9;
-  color: #000;
+/* Excel tarzında hücre görünümleri */
+.customer-item-header th, .customer-info td {
+  padding: 12px;
+  text-align: left;
 }
 
-.light .musteri-table th {
-  background-color: #f2f2f2;
-  color: #000;
-}
-
-.light .musteri-table td {
-  background-color: #fff;
-  color: #000;
-}
-
-/* Dark Theme */
-.dark .musteri-listesi-container {
-  background-color: #1e1e1e;
-  color: #fff;
-}
-
-.dark .musteri-table th {
-  background-color: #333;
-  color: #fff;
-}
-
-.dark .musteri-table td {
-  background-color: #222;
-  color: #fff;
-}
-
-/* Tablo içindeki butonlar */
-.table-button {
-  padding: 8px 12px;
-  margin: 0 5px;
+/* Butonlar */
+.button {
+  padding: 10px 15px;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: background-color 0.3s ease;
-  max-width: 50%; /* Max genişliği %50 olarak ayarladık */
+  font-size: 15px;
+  font-weight: 600;
+  transition: background-color 0.3s ease, transform 0.2s;
+  font-family: 'Roboto', sans-serif;
 }
 
-/* Onayla butonu */
-.table-button.approve {
-  background-color: #28a745;
+.button:hover {
+  transform: translateY(-2px);
+}
+
+.button-primary {
+  background-color: #007bff;
   color: #fff;
 }
 
-.table-button.approve:hover {
-  background-color: #218838;
+.button-primary:hover {
+  background-color: #0056b3;
 }
 
-/* Düzenle butonu */
-.table-button.edit {
-  background-color: #ffc107;
-  color: #000;
+.button-secondary {
+  background-color: #6c757d;
+  color: #fff;
 }
 
-.table-button.edit:hover {
-  background-color: #e0a800;
+.button-secondary:hover {
+  background-color: #5a6268;
 }
 
-/* Sil butonu */
-.table-button.delete {
+.button-danger {
   background-color: #dc3545;
   color: #fff;
 }
 
-.table-button.delete:hover {
+.button-danger:hover {
   background-color: #c82333;
-}
-
-/* Yeni Müşteri Ekle Butonu */
-.new-customer-btn {
-  background-color: #007bff;
-  color: #fff;
-  padding: 12px 20px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 16px;
-  font-weight: 600;
-  transition: background-color 0.3s ease;
-  margin-bottom: 20px;
-}
-
-.new-customer-btn:hover {
-  background-color: #0056b3;
 }
 
 /* Modal genel stil */
@@ -143,7 +122,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -151,70 +130,51 @@
 }
 
 .modal-content {
-  background-color: #fff;
-  padding: 25px;
-  border-radius: 8px;
-  max-width: 500px;
+  background: linear-gradient(135deg, #ffffff, #f7f7f7);
+  padding: 30px;
+  border-radius: 15px;
+  max-width: 700px;
   width: 100%;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  font-family: 'Roboto', sans-serif;
   position: relative;
 }
 
-/* Light mode için modal */
-.light .modal-content {
-  background-color: #fff;
-  color: #000;
+.modal-content .modal-header {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #ddd;
+  padding-bottom: 12px;
+  color: #444;
 }
 
-/* Dark mode için modal */
-.dark .modal-content {
-  background-color: #2c2c2c;
-  color: #fff;
-}
-
-/* Modal form alanları */
+/* Form alanları */
 .form-group {
   margin-bottom: 20px;
-  display: flex;
-  flex-direction: column;
 }
 
 .form-group label {
-  margin-bottom: 5px;
+  display: block;
+  margin-bottom: 8px;
   font-weight: bold;
-  font-size: 14px;
+  color: #555;
 }
 
-/* Light Mode için form etiketleri */
-.light .form-group label {
-  color: #000;
-}
-
-/* Dark Mode için form etiketleri */
-.dark .form-group label {
-  color: #fff;
-}
-
-/* Inputlar */
 .form-group input {
-  padding: 12px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 16px;
   width: 100%;
-  box-sizing: border-box;
+  padding: 12px;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+  font-size: 16px;
+  font-family: 'Roboto', sans-serif;
+  transition: border-color 0.3s;
 }
 
 .form-group input:focus {
+  border-color: #28a745;
   outline: none;
-  border-color: #007bff;
-}
-
-/* Dark Mode için input */
-.dark .form-group input {
-  background-color: #333;
-  color: #fff;
-  border: 1px solid #555;
+  box-shadow: 0 0 8px rgba(40, 167, 69, 0.5);
 }
 
 /* Modal butonları */
@@ -222,78 +182,91 @@
   display: flex;
   justify-content: flex-end;
   gap: 15px;
+  margin-top: 25px;
 }
 
-.modal-actions button {
-  padding: 10px 20px;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
+/* Mesajlar */
+.message {
+  padding: 15px;
+  margin-bottom: 25px;
+  border-radius: 6px;
+  text-align: center;
+  font-weight: 600;
 }
 
-/* Kaydet butonu */
-.modal-actions button:first-child {
-  background-color: #007bff;
-  color: white;
+.success-message {
+  background-color: #d4edda;
+  color: #155724;
+  border-left: 6px solid #28a745;
 }
 
-.modal-actions button:first-child:hover {
-  background-color: #0056b3;
+.error-message {
+  background-color: #f8d7da;
+  color: #721c24;
+  border-left: 6px solid #dc3545;
 }
 
-/* İptal butonu */
-.modal-actions button:last-child {
-  background-color: #6c757d;
-  color: white;
+/* Responsif tasarım */
+@media (max-width: 768px) {
+  .search-container {
+    flex-direction: column;
+  }
+
+  .search-input {
+    margin-right: 0;
+    margin-bottom: 15px;
+  }
+
+  .customer-item-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .customer-actions {
+    margin-top: 15px;
+  }
 }
 
-.modal-actions button:last-child:hover {
+/* Light Theme */
+.light {
+  background-color: #f9f9f9;
+  color: #333;
+}
+
+.light .customer-item-row {
+  background-color: #ffffff;
+}
+
+.light .modal-content {
+  background-color: #ffffff;
+}
+
+/* Dark Theme */
+.dark {
+  background-color: #2a2a2a;
+  color: #f9f9f9;
+}
+
+.dark .customer-item-row {
+  background-color: #3a3a3a;
+}
+
+.dark .modal-content {
+  background: linear-gradient(135deg, #3a3a3a, #444);
+  color: #f9f9f9;
+}
+
+.dark .search-input,
+.dark .form-group input {
+  background-color: #444;
+  color: #f9f9f9;
+  border-color: #555;
+}
+
+.dark .button-secondary {
   background-color: #5a6268;
 }
 
-/* Başarı mesajı stili */
-.success-message {
-  color: #4CAF50;
-  background-color: #dff0d8;
-  padding: 12px;
-  margin: 20px 0;
-  border-radius: 5px;
-  text-align: center;
-  font-weight: bold;
-}
-
-/* Hata mesajı stili */
-.error-message {
-  color: #f44336;
-  background-color: #fdd;
-  padding: 12px;
-  margin: 20px 0;
-  border-radius: 5px;
-  text-align: center;
-  font-weight: bold;
-}
-
-/* Responsive tasarım */
-@media (max-width: 768px) {
-  .musteri-table th,
-  .musteri-table td {
-    padding: 12px;
-    font-size: 14px;
-  }
-
-  .modal-content {
-    padding: 15px;
-  }
-
-  .modal-actions button {
-    padding: 8px 15px;
-    font-size: 14px;
-  }
-
-  .new-customer-btn {
-    padding: 8px 12px;
-    font-size: 14px;
-  }
+.dark .button-secondary:hover {
+  background-color: #444;
 }

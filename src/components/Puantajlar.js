@@ -1,15 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { getFirestore, collection, getDocs } from 'firebase/firestore';
-import { getStorage, ref, getDownloadURL, listAll } from 'firebase/storage';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { collection, onSnapshot, getDocs, query, where } from 'firebase/firestore';
+import { ref, getDownloadURL, listAll } from 'firebase/storage';
+import { database, storage } from './firebaseConfig';
+
 import DatePicker, { registerLocale } from 'react-datepicker';
 import tr from 'date-fns/locale/tr';
 import 'react-datepicker/dist/react-datepicker.css';
 import './Puantajlar.css';
 
+import Select from 'react-select';
+import { debounce } from 'lodash';
+
 registerLocale('tr', tr);
 
 const Puantajlar = () => {
-  const [mergedData, setMergedData] = useState([]);
+  const [allData, setAllData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [selectedPdf, setSelectedPdf] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -18,14 +23,14 @@ const Puantajlar = () => {
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
 
-  const [customerNames, setCustomerNames] = useState([]);
-  const [selectedCustomer, setSelectedCustomer] = useState('');
+  const [customerOptions, setCustomerOptions] = useState([]);
+  const [selectedCustomers, setSelectedCustomers] = useState([]);
 
-  const [machineNames, setMachineNames] = useState([]);
-  const [selectedMachine, setSelectedMachine] = useState('');
+  const [machineOptions, setMachineOptions] = useState([]);
+  const [selectedMachines, setSelectedMachines] = useState([]);
 
-  const [operatorNames, setOperatorNames] = useState([]);
-  const [selectedOperator, setSelectedOperator] = useState('');
+  const [operatorOptions, setOperatorOptions] = useState([]);
+  const [selectedOperators, setSelectedOperators] = useState([]);
 
   const [isHakedisPopupOpen, setIsHakedisPopupOpen] = useState(false);
   const [unitRate, setUnitRate] = useState('');
@@ -36,16 +41,201 @@ const Puantajlar = () => {
 
   const [isCalculating, setIsCalculating] = useState(false);
 
-  const modalRef = useRef(null);
+  const [customerMap, setCustomerMap] = useState({});
+
+  const debouncedSetStartDate = useCallback(
+    debounce((date) => setStartDate(date), 300),
+    []
+  );
+
+  const debouncedSetEndDate = useCallback(
+    debounce((date) => setEndDate(date), 300),
+    []
+  );
 
   useEffect(() => {
-    fetchCustomerNames();
-    fetchMachineNames();
-    fetchOperatorNames();
-    fetchPuantajlarAndPdfs();
+    const db = database;
+
+    const fetchCustomers = async () => {
+      try {
+        const customerSnapshot = await getDocs(collection(db, 'müşteri listesi'));
+        const customerDataMap = {};
+        const customerOptionsSet = new Set();
+
+        customerSnapshot.docs.forEach((doc) => {
+          const data = doc.data();
+          const customerName = data['Müşteri Adı'] || '';
+          const cariCode = data['cariCode'] || '';
+
+          if (cariCode) {
+            customerDataMap[cariCode] = customerName;
+            const displayText = `${cariCode}/${customerName}`;
+            customerOptionsSet.add(displayText);
+          }
+        });
+
+        setCustomerMap(customerDataMap);
+
+        const customerOptionsArray = Array.from(customerOptionsSet).map((option) => ({
+          value: option,
+          label: option,
+        }));
+
+        setCustomerOptions(customerOptionsArray.sort((a, b) => a.label.localeCompare(b.label)));
+      } catch (error) {
+        console.error('Müşteri verileri alınırken hata oluştu:', error);
+        setError('Müşteri verileri alınırken bir hata oluştu.');
+      }
+    };
+
+    const fetchMachineData = async () => {
+      try {
+        const machineSnapshot = await getDocs(collection(db, 'makineListesi'));
+        const machineDataSet = new Set();
+
+        machineSnapshot.docs.forEach((doc) => {
+          const data = doc.data();
+          const machineName = data['MakineAdı'] || '';
+          if (machineName) {
+            machineDataSet.add(machineName);
+          }
+        });
+
+        const machineOptionsArray = Array.from(machineDataSet).map((machine) => ({
+          value: machine,
+          label: machine,
+        }));
+
+        setMachineOptions(machineOptionsArray.sort((a, b) => a.label.localeCompare(b.label)));
+      } catch (error) {
+        console.error('Makine verileri alınırken hata oluştu:', error);
+      }
+    };
+
+    const fetchOperatorData = async () => {
+      try {
+        const operatorSnapshot = await getDocs(collection(db, 'operatorListesi'));
+        const operatorDataSet = new Set();
+
+        operatorSnapshot.docs.forEach((doc) => {
+          const data = doc.data();
+          const operatorName = data['name'] || '';
+          if (operatorName) {
+            operatorDataSet.add(operatorName);
+          }
+        });
+
+        const operatorOptionsArray = Array.from(operatorDataSet).map((operator) => ({
+          value: operator,
+          label: operator,
+        }));
+
+        setOperatorOptions(operatorOptionsArray.sort((a, b) => a.label.localeCompare(b.label)));
+      } catch (error) {
+        console.error('Operatör verileri alınırken hata oluştu:', error);
+      }
+    };
+
+    fetchCustomers();
+    fetchMachineData();
+    fetchOperatorData();
   }, []);
 
-  const parseDate = (dateString) => {
+  useEffect(() => {
+    const db = database;
+    const puantajlarRef = collection(db, 'puantajlar');
+
+    const unsubscribe = onSnapshot(puantajlarRef, async (snapshot) => {
+      try {
+        const puantajlarData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
+        console.log("Çekilen puantaj verileri:", puantajlarData);
+
+        const pdfListRef = ref(storage, 'pdfs/');
+        const pdfResult = await listAll(pdfListRef);
+
+        const merged = await Promise.all(pdfResult.items.map(async (itemRef) => {
+          const matchingPuantaj = puantajlarData.find(
+            (puantaj) => puantaj['Sözleşme Numarası'] === itemRef.name
+          );
+
+          let customerName = '-';
+          let cariCode = '-';
+
+          if (matchingPuantaj) {
+            const puantajCariCode = (matchingPuantaj['Cari Kodu'] || '').trim();
+            if (puantajCariCode && customerMap[puantajCariCode]) {
+              customerName = customerMap[puantajCariCode];
+              cariCode = puantajCariCode;
+            } else {
+              customerName = matchingPuantaj['Müşteri Adı'] || '-';
+              cariCode = matchingPuantaj['Cari Kodu'] || '-';
+            }
+          }
+
+          return {
+            pdfName: itemRef.name,
+            pdfRef: itemRef,
+            customerName: customerName,
+            cariCode: cariCode,
+            ...(matchingPuantaj || {}),
+          };
+        }));
+
+        console.log("Birleştirilmiş veriler:", merged);
+
+        setAllData(merged);
+        setLoading(false);
+      } catch (error) {
+        console.error('Verileri yüklerken bir hata oluştu:', error);
+        setError('Verileri yüklerken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [customerMap]);
+
+  const applyFilters = useCallback(() => {
+    let filtered = allData;
+
+    if (startDate && endDate) {
+      filtered = filtered.filter((item) => {
+        const itemDate = parseDate(item['Tarih']);
+        return itemDate >= startDate && itemDate <= endDate;
+      });
+    }
+
+    if (selectedCustomers.length > 0) {
+      filtered = filtered.filter((item) => {
+        const customerOption = `${item.cariCode}/${item.customerName}`;
+        return selectedCustomers.some((selected) => selected.value === customerOption);
+      });
+    }
+
+    if (selectedMachines.length > 0) {
+      filtered = filtered.filter((item) => {
+        return selectedMachines.some((selected) => selected.value === item['Makine İsmi']);
+      });
+    }
+
+    if (selectedOperators.length > 0) {
+      filtered = filtered.filter((item) => {
+        return selectedOperators.some((selected) => selected.value === item['Operatör Adı']);
+      });
+    }
+
+    setFilteredData(filtered);
+  }, [allData, startDate, endDate, selectedCustomers, selectedMachines, selectedOperators]);
+
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters]);
+
+  const parseDate = useCallback((dateString) => {
     if (!dateString) {
       return new Date();
     }
@@ -57,125 +247,31 @@ const Puantajlar = () => {
     }
 
     return new Date(`${year}-${month}-${day}T00:00:00`);
-  };
+  }, []);
 
-  useEffect(() => {
-    setTotalHakedis('');
-    setCalculatedTotalHours('');
-    setCalculatedTotalMinutes(0);
-
-    let filtered = mergedData;
-
-    if (startDate && endDate) {
-      filtered = filtered.filter((item) => {
-        const itemDate = parseDate(item['Tarih']);
-        return itemDate >= startDate && itemDate <= endDate;
-      });
-    }
-
-    if (selectedCustomer) {
-      filtered = filtered.filter((item) => item['Müşteri Adı'] === selectedCustomer);
-    }
-
-    if (selectedMachine) {
-      filtered = filtered.filter((item) => item['Makine İsmi'] === selectedMachine);
-    }
-
-    if (selectedOperator) {
-      filtered = filtered.filter((item) => item['Operatör Adı'] === selectedOperator);
-    }
-
-    setFilteredData(filtered);
-  }, [startDate, endDate, selectedCustomer, selectedMachine, selectedOperator, mergedData]);
-
-  const fetchCustomerNames = async () => {
-    const db = getFirestore();
-    try {
-      const customerSnapshot = await getDocs(collection(db, 'müşteri listesi'));
-      const customerData = customerSnapshot.docs.map(doc => doc.data()['Müşteri Adı']);
-      const sortedCustomerNames = customerData.sort((a, b) => a.localeCompare(b));
-      setCustomerNames(sortedCustomerNames);
-    } catch (error) {
-      console.error('Müşteri listesi alınırken hata oluştu:', error);
-    }
-  };
-
-  const fetchMachineNames = async () => {
-    const db = getFirestore();
-    try {
-      const machineSnapshot = await getDocs(collection(db, 'makineListesi'));
-      const machineData = machineSnapshot.docs.map(doc => doc.data()['MakineAdı']);
-      const sortedMachineNames = machineData.sort((a, b) => a.localeCompare(b));
-      setMachineNames(sortedMachineNames);
-    } catch (error) {
-      console.error('Makine listesi alınırken hata oluştu:', error);
-    }
-  };
-
-  const fetchOperatorNames = async () => {
-    const db = getFirestore();
-    try {
-      const operatorSnapshot = await getDocs(collection(db, 'operatorListesi'));
-      const operatorData = operatorSnapshot.docs.map(doc => doc.data()['name']);
-      const sortedOperatorNames = operatorData.sort((a, b) => a.localeCompare(b));
-      setOperatorNames(sortedOperatorNames);
-    } catch (error) {
-      console.error('Operatör listesi alınırken hata oluştu:', error);
-    }
-  };
-
-  const fetchPuantajlarAndPdfs = async () => {
-    setLoading(true);
-    setError(null);
-    const db = getFirestore();
-    const storage = getStorage();
-    const pdfListRef = ref(storage, 'pdfs/');
-
-    try {
-      const puantajlarSnapshot = await getDocs(collection(db, 'puantajlar'));
-      const puantajlarData = puantajlarSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      const pdfResult = await listAll(pdfListRef);
-
-      const merged = pdfResult.items.map(itemRef => {
-        const matchingPuantaj = puantajlarData.find(puantaj => puantaj['Sözleşme Numarası'] === itemRef.name);
-        return {
-          pdfName: itemRef.name,
-          pdfRef: itemRef,
-          ...(matchingPuantaj || {})
-        };
-      });
-
-      setMergedData(merged);
-      setFilteredData(merged);
-    } catch (error) {
-      setError('Verileri yüklerken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePdfClick = async (pdfRef, pdfName) => {
+  const handlePdfClick = useCallback(async (pdfRef, pdfName) => {
     try {
       const url = await getDownloadURL(pdfRef);
       setSelectedPdf({ url, name: pdfName });
     } catch (error) {
       console.error('PDF URL alınırken hata oluştu:', error);
     }
-  };
+  }, []);
 
-  const handleCheckboxChange = (pdfName) => {
+  const closePopup = useCallback(() => {
+    setSelectedPdf(null);
+  }, []);
+
+  const handleCheckboxChange = useCallback((pdfName) => {
     setSelectedPdfs((prevSelected) =>
       prevSelected.includes(pdfName)
         ? prevSelected.filter((name) => name !== pdfName)
         : [...prevSelected, pdfName]
     );
-  };
+  }, []);
 
-  const handleDownloadSelected = async () => {
+  const handleDownloadSelected = useCallback(async () => {
     if (selectedPdfs.length === 0) return;
-
-    const storage = getStorage();
 
     for (const pdfName of selectedPdfs) {
       try {
@@ -199,46 +295,42 @@ const Puantajlar = () => {
         console.error(`${pdfName} indirilirken hata oluştu:`, error);
       }
     }
-  };
+  }, [selectedPdfs]);
 
-  const handleSelectAll = () => {
-    const allPdfNames = filteredData.map(item => item.pdfName);
+  const handleSelectAll = useCallback(() => {
+    const allPdfNames = filteredData.map((item) => item.pdfName);
     setSelectedPdfs(allPdfNames);
-  };
+  }, [filteredData]);
 
-  const handleDeselectAll = () => {
+  const handleDeselectAll = useCallback(() => {
     setSelectedPdfs([]);
-  };
+  }, []);
 
-  const closePopup = () => {
-    setSelectedPdf(null);
-  };
-
-  const formatTime = (timeString) => {
+  const formatTime = useCallback((timeString) => {
     if (!timeString || timeString === '""') return null;
     const [hours, minutes] = timeString.replace(/"/g, '').split(':');
     if (!hours || !minutes) return null;
     return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`;
-  };
+  }, []);
 
-  const calculateDuration = (start, end) => {
+  const calculateDuration = useCallback((start, end) => {
     if (!start || !end) return 0;
     const [startHours, startMinutes] = start.split(':').map(Number);
     const [endHours, endMinutes] = end.split(':').map(Number);
-    let duration = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
+    let duration = endHours * 60 + endMinutes - (startHours * 60 + startMinutes);
     if (duration < 0) {
-      duration += 24 * 60; // Ertesi güne sarkan saatler için
+      duration += 24 * 60;
     }
     return duration;
-  };
+  }, []);
 
-  const formatDuration = (minutes) => {
+  const formatDuration = useCallback((minutes) => {
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
     return `${hours} saat ${remainingMinutes} dakika`;
-  };
+  }, []);
 
-  const calculateTotalWorkDuration = (item) => {
+  const calculateTotalWorkDuration = useCallback((item) => {
     const start1 = formatTime(item['1. Başlangıç Saati']);
     const end1 = formatTime(item['1. Bitiş Saati']);
     const start2 = formatTime(item['2. Başlangıç Saati']);
@@ -254,9 +346,9 @@ const Puantajlar = () => {
     }
 
     return formatDuration(totalDuration);
-  };
+  }, [formatTime, calculateDuration, formatDuration]);
 
-  const renderWorkHours = (item) => {
+  const renderWorkHours = useCallback((item) => {
     const start1 = formatTime(item['1. Başlangıç Saati']);
     const end1 = formatTime(item['1. Bitiş Saati']);
     const start2 = formatTime(item['2. Başlangıç Saati']);
@@ -281,13 +373,12 @@ const Puantajlar = () => {
     } else {
       return '-';
     }
-  };
+  }, [formatTime]);
 
-  const calculateTotalHours = () => {
+  const calculateTotalHours = useCallback(() => {
     let totalMinutes = 0;
 
-    filteredData.forEach(item => {
-      const start1 = formatTime(item['1. Başlangıç Saati']);
+    filteredData.forEach((item) => {const start1 = formatTime(item['1. Başlangıç Saati']);
       const end1 = formatTime(item['1. Bitiş Saati']);
       const start2 = formatTime(item['2. Başlangıç Saati']);
       const end2 = formatTime(item['2. Bitiş Saati']);
@@ -303,9 +394,9 @@ const Puantajlar = () => {
     setCalculatedTotalMinutes(totalMinutes);
 
     return totalMinutes;
-  };
+  }, [filteredData, formatTime, calculateDuration]);
 
-  const handleHakedisHesapla = () => {
+  const handleHakedisHesapla = useCallback(() => {
     let minutes = calculatedTotalMinutes;
 
     if (minutes === 0) {
@@ -321,7 +412,7 @@ const Puantajlar = () => {
         style: 'currency',
         currency: 'TRY',
         minimumFractionDigits: 2,
-        maximumFractionDigits: 2
+        maximumFractionDigits: 2,
       }).format(totalAmount);
 
       setTotalHakedis(formattedAmount);
@@ -331,20 +422,20 @@ const Puantajlar = () => {
         setIsCalculating(false);
       }, 1000);
     } else {
-      alert("Lütfen birim saat ücretini giriniz.");
+      alert('Lütfen birim saat ücretini giriniz.');
     }
-  };
+  }, [calculatedTotalMinutes, calculateTotalHours, unitRate]);
 
-  const openHakedisPopup = () => {
+  const openHakedisPopup = useCallback(() => {
     if (calculatedTotalMinutes === 0) {
       calculateTotalHours();
     }
     setIsHakedisPopupOpen(true);
-  };
+  }, [calculatedTotalMinutes, calculateTotalHours]);
 
-  const closeHakedisPopup = () => {
+  const closeHakedisPopup = useCallback(() => {
     setIsHakedisPopupOpen(false);
-  };
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -358,6 +449,18 @@ const Puantajlar = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
+  }, [closeHakedisPopup]);
+
+  const handleCustomerChange = useCallback((selectedOptions) => {
+    setSelectedCustomers(selectedOptions || []);
+  }, []);
+
+  const handleMachineChange = useCallback((selectedOptions) => {
+    setSelectedMachines(selectedOptions || []);
+  }, []);
+
+  const handleOperatorChange = useCallback((selectedOptions) => {
+    setSelectedOperators(selectedOptions || []);
   }, []);
 
   if (loading) {
@@ -373,82 +476,73 @@ const Puantajlar = () => {
       <h2>Puantajlar</h2>
 
       <div className="filter-container">
-        <div className="left-filters">
-          {/* Tarih Filtresi */}
+        <div className="filters-row">
           <div className="date-filter">
             <label>Tarih Aralığı Seçin: </label>
-            <DatePicker
-              selected={startDate}
-              onChange={date => setStartDate(date)}
-              selectsStart
-              startDate={startDate}
-              endDate={endDate}
-              dateFormat="dd.MM.yyyy"
-              placeholderText="Başlangıç Tarihi"
-              locale="tr"
-            />
-            <DatePicker
-              selected={endDate}
-              onChange={date => setEndDate(date)}
-              selectsEnd
-              startDate={startDate}
-              endDate={endDate}
-              minDate={startDate}
-              dateFormat="dd.MM.yyyy"
-              placeholderText="Bitiş Tarihi"
-              locale="tr"
-            />
+            <div className="date-pickers">
+              <DatePicker
+                selected={startDate}
+                onChange={debouncedSetStartDate}
+                selectsStart
+                startDate={startDate}
+                endDate={endDate}
+                dateFormat="dd.MM.yyyy"
+                placeholderText="Başlangıç Tarihi"
+                locale="tr"
+              />
+              <DatePicker
+                selected={endDate}
+                onChange={debouncedSetEndDate}
+                selectsEnd
+                startDate={startDate}
+                endDate={endDate}
+                minDate={startDate}
+                dateFormat="dd.MM.yyyy"
+                placeholderText="Bitiş Tarihi"
+                locale="tr"
+              />
+            </div>
           </div>
 
-          {/* Müşteri Adı Filtresi */}
           <div className="customer-filter">
-            <label>Müşteri Adı Seçin: </label>
-            <select
-              value={selectedCustomer}
-              onChange={(e) => setSelectedCustomer(e.target.value)}
-            >
-              <option value="">Hepsi</option>
-              {customerNames.map((name, index) => (
-                <option key={index} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
+            <label>Müşteri Seçin: </label>
+            <Select
+              isMulti
+              options={customerOptions}
+              value={selectedCustomers}
+              onChange={handleCustomerChange}
+              placeholder="Müşteri Seçin"
+              className="customer-select"
+              classNamePrefix="react-select"
+            />
           </div>
 
-          {/* Makine Adı Filtresi */}
           <div className="machine-filter">
             <label>Makine Adı Seçin: </label>
-            <select
-              value={selectedMachine}
-              onChange={(e) => setSelectedMachine(e.target.value)}
-            >
-              <option value="">Hepsi</option>
-              {machineNames.map((name, index) => (
-                <option key={index} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
+            <Select
+              isMulti
+              options={machineOptions}
+              value={selectedMachines}
+              onChange={handleMachineChange}
+              placeholder="Makine Adı Seçin"
+              className="machine-select"
+              classNamePrefix="react-select"
+            />
           </div>
 
-          {/* Operatör Adı Filtresi */}
           <div className="operator-filter">
             <label>Operatör Adı Seçin: </label>
-            <select
-              value={selectedOperator}
-              onChange={(e) => setSelectedOperator(e.target.value)}
-            >
-              <option value="">Hepsi</option>
-              {operatorNames.map((name, index) => (
-                <option key={index} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
+            <Select
+              isMulti
+              options={operatorOptions}
+              value={selectedOperators}
+              onChange={handleOperatorChange}
+              placeholder="Operatör Adı Seçin"
+              className="operator-select"
+              classNamePrefix="react-select"
+            />
           </div>
 
-          {/* Seçme Butonları */}
           <div className="button-group">
             <button onClick={handleSelectAll}>Hepsini Seç</button>
             <button onClick={handleDeselectAll}>Seçimleri Kaldır</button>
@@ -481,6 +575,7 @@ const Puantajlar = () => {
               <th>Seç</th>
               <th>PDF / Sözleşme Numarası</th>
               <th>Müşteri Adı</th>
+              <th>Cari Kodu</th>
               <th>Makine İsmi</th>
               <th>Operatör Adı</th>
               <th>Çalışma Saatleri</th>
@@ -508,7 +603,8 @@ const Puantajlar = () => {
                     {item.pdfName}
                   </button>
                 </td>
-                <td>{item['Müşteri Adı'] || '-'}</td>
+                <td>{item.customerName || '-'}</td>
+                <td>{item.cariCode || '-'}</td>
                 <td>{item['Makine İsmi'] || '-'}</td>
                 <td>{item['Operatör Adı'] || '-'}</td>
                 <td>{renderWorkHours(item)}</td>
@@ -550,7 +646,11 @@ const Puantajlar = () => {
             <button onClick={handleHakedisHesapla} disabled={isCalculating}>
               {isCalculating ? 'Hesaplanıyor...' : 'Hesapla'}
             </button>
-            <button onClick={closeHakedisPopup} className="close-button" disabled={isCalculating}>
+            <button
+              onClick={closeHakedisPopup}
+              className="close-button"
+              disabled={isCalculating}
+            >
               Kapat
             </button>
           </div>
@@ -560,4 +660,4 @@ const Puantajlar = () => {
   );
 };
 
-export default Puantajlar;
+export default React.memo(Puantajlar);
