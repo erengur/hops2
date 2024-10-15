@@ -13,6 +13,20 @@ import { debounce } from 'lodash';
 
 registerLocale('tr', tr);
 
+const parseDate = (dateString) => {
+  if (!dateString) {
+    return new Date();
+  }
+
+  const [day, month, year] = dateString.split('.');
+
+  if (!day || !month || !year) {
+    return new Date();
+  }
+
+  return new Date(`${year}-${month}-${day}T00:00:00`);
+};
+
 const Puantajlar = () => {
   const [allData, setAllData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -42,16 +56,24 @@ const Puantajlar = () => {
   const [isCalculating, setIsCalculating] = useState(false);
 
   const [customerMap, setCustomerMap] = useState({});
+  const [shantiyeler, setShantiyeler] = useState([]);
 
-  const debouncedSetStartDate = useCallback(
-    debounce((date) => setStartDate(date), 300),
-    []
+  const [shantiyeChanges, setShantiyeChanges] = useState({});
+
+  const debouncedSetStartDate = useMemo(
+    () => debounce((date) => setStartDate(date), 300),
+    [setStartDate]
   );
 
-  const debouncedSetEndDate = useCallback(
-    debounce((date) => setEndDate(date), 300),
-    []
+  const debouncedSetEndDate = useMemo(
+    () => debounce((date) => setEndDate(date), 300),
+    [setEndDate]
   );
+
+  const getSantiyeNameByCariCode = useCallback((cariCode) => {
+    const santiye = shantiyeler.find((s) => s['cariCode'] === cariCode);
+    return santiye ? santiye['Müşteri Adı'] : 'Silinmiş Müşteri';
+  }, [shantiyeler]);
 
   useEffect(() => {
     const db = database;
@@ -59,32 +81,35 @@ const Puantajlar = () => {
     const fetchCustomers = async () => {
       try {
         const customerSnapshot = await getDocs(collection(db, 'müşteri listesi'));
-        const customerDataMap = {};
-        const customerOptionsSet = new Set();
-    
+        const customerNameToCariCodeMap = {};
+        const shantiyelerList = [];
+
         customerSnapshot.docs.forEach((doc) => {
           const data = doc.data();
-          const customerName = data['Müşteri Adı'] || '';
-          const cariCode = data['cariCode'] || '';
-    
-          if (customerName) { // Ensure customerName is not empty
-            customerDataMap[cariCode] = customerName;
-            const displayText = `${customerName}/${cariCode}`;
-            customerOptionsSet.add(displayText);
+          const customerName = data['Müşteri Adı']?.trim() || '';
+          const cariCode = data['cariCode']?.trim() || '';
+          const isSantiye = data['Şantiye'] || '';
+
+          if (customerName && cariCode) {
+            customerNameToCariCodeMap[customerName] = cariCode;
+          }
+
+          if (isSantiye) {
+            shantiyelerList.push({ 'Müşteri Adı': customerName, 'cariCode': cariCode });
           }
         });
-    
-        setCustomerMap(customerDataMap);
-    
-        // **Updated:** Set `value` as `customerName`
-        const customerOptionsArray = Array.from(customerOptionsSet).map((option) => {
-          const [customerName, cariCode] = option.split('/');
+
+        setCustomerMap(customerNameToCariCodeMap);
+        setShantiyeler(shantiyelerList);
+
+        const customerOptionsArray = Object.keys(customerNameToCariCodeMap).map((customerName) => {
+          const cariCode = customerNameToCariCodeMap[customerName];
           return {
-            value: customerName, // Use customerName as the value
-            label: option,       // Display text remains as "Müşteri Adı/cariCode"
+            value: customerName,
+            label: `${customerName} / ${cariCode}`,
           };
         });
-    
+
         setCustomerOptions(
           customerOptionsArray.sort((a, b) => a.label.localeCompare(b.label))
         );
@@ -173,14 +198,27 @@ const Puantajlar = () => {
             let cariCode = '-';
 
             if (matchingPuantaj) {
-              const puantajCariCode = (matchingPuantaj['Cari Kodu'] || '').trim();
-              if (puantajCariCode && customerMap[puantajCariCode]) {
-                customerName = customerMap[puantajCariCode];
-                cariCode = puantajCariCode;
-              } else {
-                customerName = matchingPuantaj['Müşteri Adı'] || '-';
-                cariCode = matchingPuantaj['Cari Kodu'] || '-';
+              customerName = matchingPuantaj['Müşteri Adı']?.trim() || '-';
+              cariCode = matchingPuantaj['Cari Kodu']?.trim() || '-';
+
+              if (!cariCode || cariCode === '-') {
+                if (customerName && customerMap[customerName]) {
+                  cariCode = customerMap[customerName];
+                }
               }
+
+              if (customerName === 'Silinmiş Müşteri' && cariCode && cariCode !== '-') {
+                customerName = getSantiyeNameByCariCode(cariCode);
+              }
+            }
+
+            // Şantiye değişikliklerini kontrol et ve uygula
+            const shantiyeChange = Object.values(shantiyeChanges).find(
+              change => change.oldName === customerName
+            );
+            if (shantiyeChange) {
+              customerName = shantiyeChange.newName;
+              cariCode = shantiyeChange.newCariCode;
             }
 
             return {
@@ -205,7 +243,32 @@ const Puantajlar = () => {
     });
 
     return () => unsubscribe();
-  }, [customerMap]);
+  }, [customerMap, shantiyeler, shantiyeChanges, getSantiyeNameByCariCode]);
+
+  // Şantiye değişikliklerini izleyen yeni useEffect
+  useEffect(() => {
+    const db = database;
+    const shantiyeRef = collection(db, 'müşteri listesi');
+    const shantiyeQuery = query(shantiyeRef, where('Şantiye', '==', true));
+
+    const unsubscribe = onSnapshot(shantiyeQuery, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'modified') {
+          const newData = change.doc.data();
+          setShantiyeChanges(prev => ({
+            ...prev,
+            [change.doc.id]: {
+              oldName: change.doc.data().OldName || newData['Şantiye Adı'],
+              newName: newData['Şantiye Adı'],
+              newCariCode: newData['Şantiye Cari Kodu'],
+            }
+          }));
+        }
+      });
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const applyFilters = useCallback(() => {
     let filtered = allData;
@@ -242,20 +305,6 @@ const Puantajlar = () => {
   useEffect(() => {
     applyFilters();
   }, [applyFilters]);
-
-  const parseDate = useCallback((dateString) => {
-    if (!dateString) {
-      return new Date();
-    }
-
-    const [day, month, year] = dateString.split('.');
-
-    if (!day || !month || !year) {
-      return new Date();
-    }
-
-    return new Date(`${year}-${month}-${day}T00:00:00`);
-  }, []);
 
   const handlePdfClick = useCallback(async (pdfRef, pdfName) => {
     try {
@@ -334,6 +383,7 @@ const Puantajlar = () => {
 
   const formatDuration = useCallback((minutes) => {
     const hours = Math.floor(minutes / 60);
+
     const remainingMinutes = minutes % 60;
     return `${hours} saat ${remainingMinutes} dakika`;
   }, []);
@@ -619,11 +669,13 @@ const Puantajlar = () => {
                 <td>{renderWorkHours(item)}</td>
                 <td>{calculateTotalWorkDuration(item)}</td>
                 <td>{item['Tarih'] || '-'}</td>
-                <td>{item['Yetkili Adı'] || '-'}</td>                <td>{item['Çalışma Detayı'] || '-'}</td>
+                <td>{item['Yetkili Adı'] || '-'}</td>
+                <td>{item['Çalışma Detayı'] || '-'}</td>
               </tr>
             ))}
           </tbody>
         </table>
+
       )}
 
       {selectedPdf && (

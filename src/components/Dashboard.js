@@ -1,18 +1,18 @@
 import './Dashboard.css'; 
 import React, { useState, useEffect } from 'react';
 import { User, Moon, Sun } from 'lucide-react';
-import { collection, getDocs } from 'firebase/firestore'; 
+import { collection, query, where, onSnapshot } from 'firebase/firestore'; 
 import { database } from './firebaseConfig'; 
 import OperatorEkle from './OperatorEkle';
 import Puantajlar from './Puantajlar';
 import MusteriListesi from './MusteriListesi'; 
-import MakineTanımlama from './MakineTanımlama'; // Makine Tanımlama komponentini import edin
-import { useNavigate } from 'react-router-dom';
+import MakineTanımlama from './MakineTanımlama';
+import OnayBekleyenCari from './OnayBekleyenCari';
 
 const Dashboard = ({ userEmail, onSignOut }) => {
   const [theme, setTheme] = useState('light');
   const [activeSection, setActiveSection] = useState('home');
-  const [operators, setOperators] = useState([]);
+  const [pendingCustomerCount, setPendingCustomerCount] = useState(0);
 
   useEffect(() => {
     if (theme === 'light') {
@@ -25,12 +25,17 @@ const Dashboard = ({ userEmail, onSignOut }) => {
   }, [theme]);
 
   useEffect(() => {
-    const fetchOperators = async () => {
-      const operatorsSnapshot = await getDocs(collection(database, 'operatorListesi'));
-      const operatorList = operatorsSnapshot.docs.map((doc) => doc.data());
-      setOperators(operatorList);
-    };
-    fetchOperators();
+    const db = database;
+    const q = query(collection(db, 'müşteri listesi'), where('Onay', '==', 'Onay Bekliyor'));
+    
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      setPendingCustomerCount(querySnapshot.size);
+    }, (error) => {
+      console.error("Firestore dinleme hatası:", error);
+    });
+
+    // Cleanup function
+    return () => unsubscribe();
   }, []);
 
   const toggleTheme = () => {
@@ -46,9 +51,11 @@ const Dashboard = ({ userEmail, onSignOut }) => {
       case 'raporlama':
         return <div>Raporlama sayfası burada olacak.</div>;
       case 'makineTanitma':
-        return <MakineTanımlama />; // Makine Tanımlama sayfası burada açılacak
+        return <MakineTanımlama />;
       case 'musteriListesi':
         return <MusteriListesi theme={theme} />;
+      case 'onayBekleyenCari':
+        return <OnayBekleyenCari theme={theme} />;
       default:
         return (
           <div className="welcome-message">
@@ -98,11 +105,19 @@ const Dashboard = ({ userEmail, onSignOut }) => {
             <li>
               <button onClick={() => setActiveSection('makineTanitma')}>
                 Makine Tanımlama
-              </button> {/* Makine Tanımlama butonu */}
+              </button>
             </li>
             <li>
               <button onClick={() => setActiveSection('musteriListesi')}>
                 Müşteri Listesi
+              </button>
+            </li>
+            <li>
+              <button onClick={() => setActiveSection('onayBekleyenCari')}>
+                Onay Bekleyen Cari
+                {pendingCustomerCount > 0 && (
+                  <span className="notification-badge">{pendingCustomerCount}</span>
+                )}
               </button>
             </li>
           </ul>

@@ -7,28 +7,21 @@ import {
 import {
   Container,
   Typography,
-  Button,
   Snackbar,
   Alert,
 } from '@mui/material';
 
 import CustomerTable from './CustomerTable';
 import EditCustomerModal from './EditCustomerModal';
-import AddCustomerModal from './AddCustomerModal';
-import DeleteCustomerModal from './DeleteCustomerModal';
 
-const MusteriListesi = () => {
-  const [approvedCustomers, setApprovedCustomers] = useState([]);
+const OnayBekleyenCari = () => {
+  const [pendingCustomers, setPendingCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [alertOpen, setAlertOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   useEffect(() => {
     const db = getFirestore();
@@ -44,7 +37,7 @@ const MusteriListesi = () => {
           parentId: doc.data().parentId || null,
         }));
 
-        setApprovedCustomers(customerData.filter(customer => customer['Onay'] === 'Onaylandı'));
+        setPendingCustomers(customerData.filter(customer => customer['Onay'] === 'Onay Bekliyor'));
         setLoading(false);
       },
       (error) => {
@@ -62,19 +55,10 @@ const MusteriListesi = () => {
     setIsEditModalOpen(true);
   };
 
-  const openDeleteModal = (customer) => {
-    setSelectedCustomer(customer);
-    setIsDeleteModalOpen(true);
-  };
-
   const handleCloseAlert = () => {
     setAlertOpen(false);
     setError(null);
     setSuccessMessage('');
-  };
-
-  const getSantiyeForCompany = (companyId) => {
-    return approvedCustomers.filter(customer => customer.parentId === companyId);
   };
 
   if (loading) {
@@ -85,7 +69,7 @@ const MusteriListesi = () => {
     );
   }
 
-  if (error && !selectedCustomer) {
+  if (error) {
     return (
       <Container>
         <Typography color="error">{error}</Typography>
@@ -96,23 +80,13 @@ const MusteriListesi = () => {
   return (
     <Container>
       <Typography variant="h4" gutterBottom>
-        Onaylanmış Müşteri Listesi
+        Onay Bekleyen Cari Listesi
       </Typography>
 
-      <Button
-        variant="contained"
-        color="primary"
-        onClick={() => setIsAddModalOpen(true)}
-      >
-        Yeni Müşteri Ekle
-      </Button>
-
       <CustomerTable
-        customers={approvedCustomers.filter(customer => customer.parentId === null)}
+        customers={pendingCustomers}
         onEdit={openEditModal}
-        onDelete={openDeleteModal}
-        type="approved"
-        getSantiyeForCompany={getSantiyeForCompany}
+        type="pending"
       />
 
       <EditCustomerModal
@@ -120,28 +94,10 @@ const MusteriListesi = () => {
         onClose={() => setIsEditModalOpen(false)}
         selectedCustomer={selectedCustomer}
         setSelectedCustomer={setSelectedCustomer}
-        approvedCustomers={approvedCustomers}
+        approvedCustomers={[]}
         setAlertOpen={setAlertOpen}
         setError={setError}
         setSuccessMessage={setSuccessMessage}
-      />
-
-      <AddCustomerModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        setAlertOpen={setAlertOpen}
-        setError={setError}
-        setSuccessMessage={setSuccessMessage}
-      />
-
-      <DeleteCustomerModal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        selectedCustomer={selectedCustomer}
-        setAlertOpen={setAlertOpen}
-        setError={setError}
-        setSuccessMessage={setSuccessMessage}
-        setSelectedCustomer={setSelectedCustomer}
       />
 
       <Snackbar
@@ -161,4 +117,4 @@ const MusteriListesi = () => {
   );
 };
 
-export default MusteriListesi;
+export default OnayBekleyenCari;
