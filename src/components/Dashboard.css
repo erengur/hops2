@@ -50,6 +50,14 @@ body.dark-theme .topbar {
   display: flex;
   align-items: center;
   gap: 10px;
+  font-weight: bold;
+}
+
+.user-info span {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .topbar-actions {
@@ -81,6 +89,8 @@ body.dark-theme .topbar {
   left: 0;
   box-shadow: 4px 0 8px rgba(0, 0, 0, 0.1);
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 body.dark-theme .leftbar {
@@ -90,6 +100,7 @@ body.dark-theme .leftbar {
 .leftbar ul {
   list-style: none;
   padding: 0;
+  flex-grow: 1;
 }
 
 .leftbar button {
@@ -238,4 +249,39 @@ body.dark-theme .leftbar .dropdown > button:hover {
   align-items: center;
   justify-content: center;
   font-weight: bold;
+}
+
+/* Yeni stiller */
+.company-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 10px;
+}
+
+/* Yeni eklenen Firma Bilgileri butonu için stil */
+.firma-bilgileri-button {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-right: 10px;
+}
+
+.firma-bilgileri-button:hover {
+  background-color: #218838;
+}
+
+/* HOPS yazısı için yeni stil */
+.hops-text {
+  font-size: 48px;
+  font-weight: bold;
+  color: rgb(240 248 255);
+
+  text-align: center;
+  padding: 20px 0;
+  margin-top: auto;
 }

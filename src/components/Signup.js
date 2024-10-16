@@ -1,46 +1,61 @@
 import React, { useState } from 'react';
-import { createUserWithEmailAndPassword } from 'firebase/auth'; // Firebase Authentication kayıt fonksiyonu
-import { auth, database } from './firebaseConfig'; // Firebase yapılandırma dosyası
-import { collection, addDoc } from 'firebase/firestore'; // Firestore işlemleri
-import './signup.css'; // Signup için CSS dosyası
-import { useNavigate } from 'react-router-dom'; // Yönlendirme için
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth, database, storage } from './firebaseConfig';
+import { collection, addDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import './signup.css';
+import { useNavigate } from 'react-router-dom';
 
 const Signup = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [address, setAddress] = useState(''); // Yeni Adres alanı
-  const [phoneNumber, setPhoneNumber] = useState(''); // Yeni Telefon Numarası alanı
+  const [address, setAddress] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [logo, setLogo] = useState(null);
   const [message, setMessage] = useState('');
-  const [showPopup, setShowPopup] = useState(false); // Popup kontrolü için state
+  const [showPopup, setShowPopup] = useState(false);
   const navigate = useNavigate();
+
+  const handleLogoChange = (e) => {
+    if (e.target.files[0]) {
+      setLogo(e.target.files[0]);
+    }
+  };
 
   const handleSignup = async (e) => {
     e.preventDefault();
 
     try {
-      // Firebase Authentication ile yeni kullanıcı kaydet
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Firestore'da "users" koleksiyonuna kullanıcıyı ekle
+      let logoUrl = '';
+      if (logo) {
+        const logoRef = ref(storage, `logos/${user.uid}`);
+        await uploadBytes(logoRef, logo);
+        logoUrl = await getDownloadURL(logoRef);
+      }
+
       await addDoc(collection(database, 'users'), {
         email: user.email,
         uid: user.uid,
-        address: address, // Adres bilgisi
-        phoneNumber: phoneNumber, // Telefon numarası
+        address: address,
+        phoneNumber: phoneNumber,
+        companyName: companyName,
+        logoUrl: logoUrl,
         createdAt: new Date().toISOString()
       });
 
-      setMessage('Kayıt başarılı!'); // Başarılı mesajı
-      setShowPopup(true); // Popup'ı göster
+      setMessage('Kayıt başarılı!');
+      setShowPopup(true);
 
-      // 2 saniye sonra popup'ı kapat ve login sayfasına yönlendir
       setTimeout(() => {
         setShowPopup(false);
-        navigate('/'); // Login sayfasına yönlendir
+        navigate('/');
       }, 2000);
     } catch (error) {
-      setMessage('Kayıt başarısız: ' + error.message); // Hata mesajı
+      setMessage('Kayıt başarısız: ' + error.message);
     }
   };
 
@@ -66,7 +81,15 @@ const Signup = () => {
         />
         <input
           type="text"
-          placeholder="Adres" // Adres alanı
+          placeholder="Firma Adı"
+          value={companyName}
+          onChange={(e) => setCompanyName(e.target.value)}
+          required
+          className="signup-input"
+        />
+        <input
+          type="text"
+          placeholder="Adres"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           required
@@ -74,16 +97,29 @@ const Signup = () => {
         />
         <input
           type="text"
-          placeholder="Telefon Numarası" // Telefon numarası alanı
+          placeholder="Telefon Numarası"
           value={phoneNumber}
           onChange={(e) => setPhoneNumber(e.target.value)}
           required
           className="signup-input"
         />
+        <div className="file-input-container">
+          <label htmlFor="logo-upload" className="file-input-label">
+            Logo Seç
+          </label>
+          <input
+            id="logo-upload"
+            type="file"
+            accept="image/*"
+            onChange={handleLogoChange}
+            className="file-input"
+          />
+          {logo && <span className="file-name">{logo.name}</span>}
+        </div>
         <button type="submit" className="signup-button">Kayıt Ol</button>
         {message && <p className="signup-message">{message}</p>}
       </form>
-
+  
       {showPopup && (
         <div className="popup-message">
           Kullanıcı başarıyla oluşturuldu!

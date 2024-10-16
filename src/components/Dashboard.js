@@ -1,19 +1,22 @@
 import './Dashboard.css'; 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { User, Moon, Sun, ChevronDown, ChevronUp } from 'lucide-react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore'; 
+import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore'; 
 import { database } from './firebaseConfig'; 
 import OperatorEkle from './OperatorEkle';
 import Puantajlar from './Puantajlar';
 import MusteriListesi from './MusteriListesi'; 
 import MakineTanımlama from './MakineTanımlama';
 import OnayBekleyenCari from './OnayBekleyenCari';
+import FirmaBilgileriGuncelle from './FirmaBilgileriGuncelle';
 
 const Dashboard = ({ userEmail, onSignOut }) => {
   const [theme, setTheme] = useState('light');
   const [activeSection, setActiveSection] = useState('home');
   const [pendingCustomerCount, setPendingCustomerCount] = useState(0);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [userData, setUserData] = useState(null);
+  const [showFirmaBilgileri, setShowFirmaBilgileri] = useState(false);
 
   useEffect(() => {
     if (theme === 'light') {
@@ -38,12 +41,38 @@ const Dashboard = ({ userEmail, onSignOut }) => {
     return () => unsubscribe();
   }, []);
 
+  const fetchUserData = useCallback(async () => {
+    const db = database;
+    const userQuery = query(collection(db, 'users'), where('email', '==', userEmail));
+    const querySnapshot = await getDocs(userQuery);
+    if (!querySnapshot.empty) {
+      setUserData(querySnapshot.docs[0].data());
+    }
+  }, [userEmail]);
+
+  useEffect(() => {
+    fetchUserData();
+  }, [fetchUserData]);
+
   const toggleTheme = () => {
     setTheme(theme === 'light' ? 'dark' : 'light');
   };
 
   const toggleDropdown = () => {
     setIsDropdownOpen(!isDropdownOpen);
+  };
+
+  const handleFirmaBilgileriClick = () => {
+    setShowFirmaBilgileri(true);
+  };
+
+  const handleFirmaBilgileriClose = () => {
+    setShowFirmaBilgileri(false);
+    fetchUserData();
+  };
+
+  const handleUserDataUpdate = (updatedData) => {
+    setUserData(updatedData);
   };
 
   const renderContent = () => {
@@ -76,10 +105,17 @@ const Dashboard = ({ userEmail, onSignOut }) => {
     <div className="dashboard-layout">
       <div className="topbar">
         <div className="user-info">
-          <User size={24} />
-          <span>{userEmail}</span>
+          {userData && userData.logoUrl ? (
+            <img src={userData.logoUrl} alt="Company Logo" className="company-logo" />
+          ) : (
+            <User size={24} />
+          )}
+          <span>{userData ? userData.companyName : userEmail}</span>
         </div>
         <div className="topbar-actions">
+          <button onClick={handleFirmaBilgileriClick} className="firma-bilgileri-button">
+            Firma Bilgileri
+          </button>
           <button onClick={toggleTheme} className="theme-toggle">
             {theme === 'light' ? <Moon size={24} /> : <Sun size={24} />}
           </button>
@@ -120,36 +156,43 @@ const Dashboard = ({ userEmail, onSignOut }) => {
                     </button>
                   </li>
                   <li>
-                  <button onClick={() => setActiveSection('bankaTanitma')}>
+                    <button onClick={() => setActiveSection('bankaTanitma')}>
                       Banka Tanıtım
                     </button>
                   </li>
                   <li>
-                    <li>
-                      <button onClick={() => setActiveSection('musteriListesi')}>
+                    <button onClick={() => setActiveSection('musteriListesi')}>
                       Cari Tanıtım
                     </button>
-                    
                   </li>
-                  <button onClick={() => setActiveSection('onayBekleyenCari')}>
+                  <li>
+                    <button onClick={() => setActiveSection('onayBekleyenCari')}>
                       Onay Bekleyen Cari Tanıtım
                       {pendingCustomerCount > 0 && (
                         <span className="notification-badge">{pendingCustomerCount}</span>
                       )}
                     </button>
-                    
                   </li>
-                  
                 </ul>
               )}
             </li>
           </ul>
+          <div className="hops-text">HOPS</div>
         </div>
 
         <div className="content">
           {renderContent()}
         </div>
       </div>
+
+      {showFirmaBilgileri && (
+        <FirmaBilgileriGuncelle
+          userData={userData}
+          onClose={handleFirmaBilgileriClose}
+          userEmail={userEmail}
+          onUpdate={handleUserDataUpdate}
+        />
+      )}
     </div>
   );
 };
