@@ -40,7 +40,7 @@ const MusteriListesi = () => {
           ...doc.data(),
           'Müşteri Adı': doc.data()['Müşteri Adı'] || '',
           cariCode: doc.data()['cariCode'] || '',
-          Şantiye: doc.data()['Şantiye'] || '',
+          Şantiye: doc.data()['Şantiye'] || false,
           parentId: doc.data().parentId || null,
         }));
 
@@ -73,8 +73,12 @@ const MusteriListesi = () => {
     setSuccessMessage('');
   };
 
-  const getSantiyeForCompany = (companyId) => {
-    return approvedCustomers.filter(customer => customer.parentId === companyId);
+  const getCustomersWithŞantiye = () => {
+    const mainCustomers = approvedCustomers.filter(customer => customer.parentId === null);
+    return mainCustomers.map(customer => ({
+      ...customer,
+      şantiyeler: approvedCustomers.filter(şantiye => şantiye.parentId === customer.id)
+    }));
   };
 
   if (loading) {
@@ -103,16 +107,16 @@ const MusteriListesi = () => {
         variant="contained"
         color="primary"
         onClick={() => setIsAddModalOpen(true)}
+        style={{ marginBottom: '20px' }}
       >
         Yeni Müşteri Ekle
       </Button>
 
       <CustomerTable
-        customers={approvedCustomers.filter(customer => customer.parentId === null)}
+        customers={getCustomersWithŞantiye()}
         onEdit={openEditModal}
         onDelete={openDeleteModal}
         type="approved"
-        getSantiyeForCompany={getSantiyeForCompany}
       />
 
       <EditCustomerModal

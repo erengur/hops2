@@ -208,23 +208,25 @@ const EditCustomerModal = ({
 
   const confirmUpdate = async () => {
     setIsConfirmUpdateOpen(false);
-
+  
     const db = getFirestore();
+    const batch = writeBatch(db);
+  
     try {
       const oldCustomerName = (selectedCustomer['Müşteri Adı'] || '').trim();
       const oldCariCode = (selectedCustomer.cariCode || '').trim();
-
+      const newCariCode = editCariCode.trim();
+  
+      // Ana müşteriyi güncelle
       const customerRef = doc(db, 'müşteri listesi', selectedCustomer.id);
-      await updateDoc(customerRef, {
+      batch.update(customerRef, {
         'Müşteri Adı': editName.trim(),
         Telefon: editPhone.trim(),
         'E-posta': editEmail.trim(),
-        cariCode: editCariCode.trim(),
+        cariCode: newCariCode,
         Onay: 'Onaylandı',
       });
-
-      const batch = writeBatch(db);
-
+  
       // İlgili Puantajları Güncelle
       const puantajlarRef = collection(db, 'puantajlar');
       const puantajQuery = query(
@@ -232,17 +234,56 @@ const EditCustomerModal = ({
         where('Müşteri Adı', '==', oldCustomerName)
       );
       const puantajlarSnapshot = await getDocs(puantajQuery);
-
+  
       puantajlarSnapshot.forEach((puantajDoc) => {
         batch.update(puantajDoc.ref, {
           'Müşteri Adı': editName.trim(),
-          'Cari Kodu': editCariCode.trim(),
+          'Cari Kodu': newCariCode,
         });
       });
-
+  
+      // Şantiyeleri güncelle
+      if (oldCariCode !== newCariCode) {
+        const santiyeQuery = query(
+          collection(db, 'müşteri listesi'),
+          where('parentId', '==', selectedCustomer.id)
+        );
+        const santiyeSnapshot = await getDocs(santiyeQuery);
+  
+        santiyeSnapshot.forEach((santiyeDoc) => {
+          const santiyeData = santiyeDoc.data();
+          const oldSantiyeCariCode = santiyeData['Şantiye Cari Kodu'];
+          const santiyeNumber = oldSantiyeCariCode.split('/').pop();
+          const newSantiyeCariCode = `${newCariCode}/${santiyeNumber}`;
+  
+          batch.update(santiyeDoc.ref, {
+            'Şantiye Cari Kodu': newSantiyeCariCode,
+            cariCode: newSantiyeCariCode,
+          });
+        });
+  
+        // Şantiyelere ait puantajları güncelle
+        for (const santiyeDoc of santiyeSnapshot.docs) {
+          const santiyeData = santiyeDoc.data();
+          const santiyePuantajQuery = query(
+            puantajlarRef,
+            where('Müşteri Adı', '==', santiyeData['Müşteri Adı'])
+          );
+          const santiyePuantajSnapshot = await getDocs(santiyePuantajQuery);
+  
+          santiyePuantajSnapshot.forEach((puantajDoc) => {
+            const newSantiyeCariCode = `${newCariCode}/${santiyeData['Şantiye Cari Kodu'].split('/').pop()}`;
+            batch.update(puantajDoc.ref, {
+              'Cari Kodu': newSantiyeCariCode,
+            });
+          });
+        }
+      }
+  
+      // Tüm değişiklikleri commit et
       await batch.commit();
-
-      setSuccessMessage('Müşteri başarıyla güncellendi.');
+  
+      setSuccessMessage('Müşteri ve ilgili şantiyeler başarıyla güncellendi.');
       setAlertOpen(true);
       onClose();
       setSelectedCustomer(null);

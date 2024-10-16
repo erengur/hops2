@@ -15,6 +15,7 @@ import CustomerTable from './CustomerTable';
 import EditCustomerModal from './EditCustomerModal';
 
 const OnayBekleyenCari = () => {
+  const [approvedCustomers, setApprovedCustomers] = useState([]);
   const [pendingCustomers, setPendingCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -36,8 +37,9 @@ const OnayBekleyenCari = () => {
           Şantiye: doc.data()['Şantiye'] || '',
           parentId: doc.data().parentId || null,
         }));
-
+      
         setPendingCustomers(customerData.filter(customer => customer['Onay'] === 'Onay Bekliyor'));
+        setApprovedCustomers(customerData.filter(customer => customer['Onay'] === 'Onaylandı'));
         setLoading(false);
       },
       (error) => {
@@ -89,16 +91,16 @@ const OnayBekleyenCari = () => {
         type="pending"
       />
 
-      <EditCustomerModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        selectedCustomer={selectedCustomer}
-        setSelectedCustomer={setSelectedCustomer}
-        approvedCustomers={[]}
-        setAlertOpen={setAlertOpen}
-        setError={setError}
-        setSuccessMessage={setSuccessMessage}
-      />
+<EditCustomerModal
+  isOpen={isEditModalOpen}
+  onClose={() => setIsEditModalOpen(false)}
+  selectedCustomer={selectedCustomer}
+  setSelectedCustomer={setSelectedCustomer}
+  approvedCustomers={approvedCustomers}
+  setAlertOpen={setAlertOpen}
+  setError={setError}
+  setSuccessMessage={setSuccessMessage}
+/>
 
       <Snackbar
         open={alertOpen}

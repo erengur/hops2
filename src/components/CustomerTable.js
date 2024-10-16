@@ -1,6 +1,4 @@
-// src/components/CustomerTable.js
-
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Table,
   TableBody,
@@ -9,82 +7,152 @@ import {
   TableHead,
   TableRow,
   Paper,
-  Button,
+  IconButton,
+  TableSortLabel,
+  Collapse,
+  Box,
+  Typography,
 } from '@mui/material';
-import { styled } from '@mui/material/styles';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 
-const TableContainerStyled = styled(TableContainer)(({ theme }) => ({
-  '& .MuiTableCell-root': {
-    borderBottom: '1px solid #ccc',
-    borderRight: '1px solid #ccc',
-  },
-  '& .MuiTableCell-root:last-child': {
-    borderRight: 'none',
-  },
-}));
+const CustomerTable = ({ customers, onEdit, onDelete, type }) => {
+  const [orderBy, setOrderBy] = useState('Müşteri Adı');
+  const [order, setOrder] = useState('asc');
+  const [openRows, setOpenRows] = useState({});
 
-const CustomerTable = ({ customers, onEdit, onDelete, type, getSantiyeForCompany }) => {
+  const handleRequestSort = (property) => {
+    const isAsc = orderBy === property && order === 'asc';
+    setOrder(isAsc ? 'desc' : 'asc');
+    setOrderBy(property);
+  };
+
+  const sortedCustomers = [...customers].sort((a, b) => {
+    if (orderBy === 'cariCode') {
+      return order === 'asc' 
+        ? a.cariCode.localeCompare(b.cariCode, undefined, {numeric: true, sensitivity: 'base'})
+        : b.cariCode.localeCompare(a.cariCode, undefined, {numeric: true, sensitivity: 'base'});
+    } else {
+      return order === 'asc'
+        ? a['Müşteri Adı'].localeCompare(b['Müşteri Adı'])
+        : b['Müşteri Adı'].localeCompare(a['Müşteri Adı']);
+    }
+  });
+
+  const toggleRow = (id) => {
+    setOpenRows(prevState => ({ ...prevState, [id]: !prevState[id] }));
+  };
+
   return (
-    <TableContainerStyled component={Paper}>
+    <TableContainer component={Paper}>
       <Table>
         <TableHead>
           <TableRow>
-            <TableCell style={{ width: '25%' }}>Müşteri Adı</TableCell>
-            <TableCell style={{ width: '15%' }}>Telefon</TableCell>
-            <TableCell style={{ width: '20%' }}>E-posta</TableCell>
-            <TableCell style={{ width: '15%' }}>Cari Kodu</TableCell>
-            <TableCell style={{ width: '15%' }}>Şantiyeler</TableCell>
-            <TableCell style={{ width: '10%' }}>İşlemler</TableCell>
+            <TableCell padding="checkbox" />
+            <TableCell>
+              <TableSortLabel
+                active={orderBy === 'Müşteri Adı'}
+                direction={orderBy === 'Müşteri Adı' ? order : 'asc'}
+                onClick={() => handleRequestSort('Müşteri Adı')}
+              >
+                Müşteri Adı
+              </TableSortLabel>
+            </TableCell>
+            <TableCell>
+              <TableSortLabel
+                active={orderBy === 'cariCode'}
+                direction={orderBy === 'cariCode' ? order : 'asc'}
+                onClick={() => handleRequestSort('cariCode')}
+              >
+                Cari Kodu
+              </TableSortLabel>
+            </TableCell>
+            <TableCell>Telefon</TableCell>
+            <TableCell>E-posta</TableCell>
+            <TableCell>İşlemler</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
-          {customers.map((customer) => (
+          {sortedCustomers.map((customer) => (
             <React.Fragment key={customer.id}>
               <TableRow>
-                <TableCell>{customer['Müşteri Adı']}</TableCell>
-                <TableCell>{customer['Telefon']}</TableCell>
-                <TableCell>{customer['E-posta']}</TableCell>
-                <TableCell>{customer['cariCode']}</TableCell>
-                <TableCell>
-                  {type === 'approved' && getSantiyeForCompany ? (
-                    getSantiyeForCompany(customer.id).length > 0 ? (
-                      <ul style={{ paddingLeft: '20px', margin: 0 }}>
-                        {getSantiyeForCompany(customer.id).map(santiye => (
-                          <li key={santiye.id}>{santiye['Müşteri Adı']}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      'Yok'
-                    )
-                  ) : (
-                    'Yok'
+                <TableCell padding="checkbox">
+                  {customer.şantiyeler && customer.şantiyeler.length > 0 && (
+                    <IconButton
+                      aria-label="expand row"
+                      size="small"
+                      onClick={() => toggleRow(customer.id)}
+                    >
+                      {openRows[customer.id] ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+                    </IconButton>
                   )}
                 </TableCell>
+                <TableCell>{customer['Müşteri Adı']}</TableCell>
+                <TableCell>{customer.cariCode}</TableCell>
+                <TableCell>{customer.Telefon}</TableCell>
+                <TableCell>{customer['E-posta']}</TableCell>
                 <TableCell>
-                  <Button
-                    variant="outlined"
-                    color="primary"
-                    onClick={() => onEdit(customer)}
-                  >
-                    Düzenle
-                  </Button>
+                  <IconButton onClick={() => onEdit(customer)}>
+                    <EditIcon />
+                  </IconButton>
                   {type === 'approved' && (
-                    <Button
-                      variant="outlined"
-                      color="secondary"
-                      onClick={() => onDelete(customer)}
-                      style={{ marginLeft: '10px' }}
-                    >
-                      Sil
-                    </Button>
+                    <IconButton onClick={() => onDelete(customer)}>
+                      <DeleteIcon />
+                    </IconButton>
                   )}
                 </TableCell>
               </TableRow>
+              {customer.şantiyeler && customer.şantiyeler.length > 0 && (
+                <TableRow>
+                  <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
+                    <Collapse in={openRows[customer.id]} timeout="auto" unmountOnExit>
+                      <Box margin={1}>
+                        <Typography variant="h6" gutterBottom component="div">
+                          Şantiyeler
+                        </Typography>
+                        <Table size="small" aria-label="şantiyeler">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Şantiye Adı</TableCell>
+                              <TableCell>Cari Kodu</TableCell>
+                              <TableCell>Telefon</TableCell>
+                              <TableCell>E-posta</TableCell>
+                              <TableCell>İşlemler</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {customer.şantiyeler.map((şantiye) => (
+                              <TableRow key={şantiye.id}>
+                                <TableCell component="th" scope="row">
+                                  {şantiye['Müşteri Adı']}
+                                </TableCell>
+                                <TableCell>{şantiye.cariCode}</TableCell>
+                                <TableCell>{şantiye.Telefon}</TableCell>
+                                <TableCell>{şantiye['E-posta']}</TableCell>
+                                <TableCell>
+                                  <IconButton onClick={() => onEdit(şantiye)}>
+                                    <EditIcon />
+                                  </IconButton>
+                                  <IconButton onClick={() => onDelete(şantiye)}>
+                                    <DeleteIcon />
+                                  </IconButton>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </Box>
+                    </Collapse>
+                  </TableCell>
+                </TableRow>
+              )}
             </React.Fragment>
           ))}
         </TableBody>
       </Table>
-    </TableContainerStyled>
+    </TableContainer>
   );
 };
 
