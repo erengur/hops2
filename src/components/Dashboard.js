@@ -1,6 +1,6 @@
 import './Dashboard.css'; 
 import React, { useState, useEffect } from 'react';
-import { User, Moon, Sun } from 'lucide-react';
+import { User, Moon, Sun, ChevronDown, ChevronUp } from 'lucide-react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore'; 
 import { database } from './firebaseConfig'; 
 import OperatorEkle from './OperatorEkle';
@@ -13,6 +13,7 @@ const Dashboard = ({ userEmail, onSignOut }) => {
   const [theme, setTheme] = useState('light');
   const [activeSection, setActiveSection] = useState('home');
   const [pendingCustomerCount, setPendingCustomerCount] = useState(0);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
     if (theme === 'light') {
@@ -34,12 +35,15 @@ const Dashboard = ({ userEmail, onSignOut }) => {
       console.error("Firestore dinleme hatası:", error);
     });
 
-    // Cleanup function
     return () => unsubscribe();
   }, []);
 
   const toggleTheme = () => {
     setTheme(theme === 'light' ? 'dark' : 'light');
+  };
+
+  const toggleDropdown = () => {
+    setIsDropdownOpen(!isDropdownOpen);
   };
 
   const renderContent = () => {
@@ -93,32 +97,41 @@ const Dashboard = ({ userEmail, onSignOut }) => {
               </button>
             </li>
             <li>
-              <button onClick={() => setActiveSection('operatorEkle')}>
-                Operatör Ekle
-              </button>
-            </li>
-            <li>
               <button onClick={() => setActiveSection('raporlama')}>
                 Raporlama
               </button>
             </li>
-            <li>
-              <button onClick={() => setActiveSection('makineTanitma')}>
-                Makine Tanımlama
+            <li className="dropdown">
+              <button onClick={toggleDropdown}>
+                Tanıtım Kartları {isDropdownOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
               </button>
-            </li>
-            <li>
-              <button onClick={() => setActiveSection('musteriListesi')}>
-                Müşteri Listesi
-              </button>
-            </li>
-            <li>
-              <button onClick={() => setActiveSection('onayBekleyenCari')}>
-                Onay Bekleyen Cari
-                {pendingCustomerCount > 0 && (
-                  <span className="notification-badge">{pendingCustomerCount}</span>
-                )}
-              </button>
+              {isDropdownOpen && (
+                <ul className="dropdown-menu">
+                  <li>
+                    <button onClick={() => setActiveSection('makineTanitma')}>
+                      Makine Tanıtım
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => setActiveSection('operatorEkle')}>
+                      Operatör Tanıtım
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => setActiveSection('musteriListesi')}>
+                      Cari Tanıtım
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => setActiveSection('onayBekleyenCari')}>
+                      Onay Bekleyen Cari Tanıtım
+                      {pendingCustomerCount > 0 && (
+                        <span className="notification-badge">{pendingCustomerCount}</span>
+                      )}
+                    </button>
+                  </li>
+                </ul>
+              )}
             </li>
           </ul>
         </div>

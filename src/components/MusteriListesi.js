@@ -14,6 +14,7 @@ import {
 
 import CustomerTable from './CustomerTable';
 import EditCustomerModal from './EditCustomerModal';
+import EditSantiyeModal from './EditSantiyeModal';
 import AddCustomerModal from './AddCustomerModal';
 import DeleteCustomerModal from './DeleteCustomerModal';
 
@@ -25,8 +26,10 @@ const MusteriListesi = () => {
   const [successMessage, setSuccessMessage] = useState('');
 
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [selectedSantiye, setSelectedSantiye] = useState(null);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isEditSantiyeModalOpen, setIsEditSantiyeModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
@@ -60,6 +63,11 @@ const MusteriListesi = () => {
   const openEditModal = (customer) => {
     setSelectedCustomer(customer);
     setIsEditModalOpen(true);
+  };
+
+  const openEditSantiyeModal = (santiye) => {
+    setSelectedSantiye(santiye);
+    setIsEditSantiyeModalOpen(true);
   };
 
   const openDeleteModal = (customer) => {
@@ -113,17 +121,29 @@ const MusteriListesi = () => {
       </Button>
 
       <CustomerTable
-        customers={getCustomersWithŞantiye()}
-        onEdit={openEditModal}
-        onDelete={openDeleteModal}
-        type="approved"
-      />
+  customers={getCustomersWithŞantiye()}
+  onEdit={openEditModal}
+  onEditSantiye={openEditSantiyeModal}
+  onDelete={openDeleteModal}
+  type="approved"
+/>
 
       <EditCustomerModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         selectedCustomer={selectedCustomer}
         setSelectedCustomer={setSelectedCustomer}
+        approvedCustomers={approvedCustomers}
+        setAlertOpen={setAlertOpen}
+        setError={setError}
+        setSuccessMessage={setSuccessMessage}
+      />
+
+      <EditSantiyeModal
+        isOpen={isEditSantiyeModalOpen}
+        onClose={() => setIsEditSantiyeModalOpen(false)}
+        selectedSantiye={selectedSantiye}
+        setSelectedSantiye={setSelectedSantiye}
         approvedCustomers={approvedCustomers}
         setAlertOpen={setAlertOpen}
         setError={setError}

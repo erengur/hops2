@@ -18,7 +18,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 
-const CustomerTable = ({ customers, onEdit, onDelete, type }) => {
+const CustomerTable = ({ customers, onEdit, onEditSantiye, onDelete, type }) => {
   const [orderBy, setOrderBy] = useState('Müşteri Adı');
   const [order, setOrder] = useState('asc');
   const [openRows, setOpenRows] = useState({});
@@ -132,7 +132,7 @@ const CustomerTable = ({ customers, onEdit, onDelete, type }) => {
                                 <TableCell>{şantiye.Telefon}</TableCell>
                                 <TableCell>{şantiye['E-posta']}</TableCell>
                                 <TableCell>
-                                  <IconButton onClick={() => onEdit(şantiye)}>
+                                  <IconButton onClick={() => onEditSantiye(şantiye)}>
                                     <EditIcon />
                                   </IconButton>
                                   <IconButton onClick={() => onDelete(şantiye)}>
