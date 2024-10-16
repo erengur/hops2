@@ -58,6 +58,8 @@ const Dashboard = ({ userEmail, onSignOut }) => {
         return <MakineTanımlama />;
       case 'musteriListesi':
         return <MusteriListesi theme={theme} />;
+      case 'bankaTanitma':
+        return <div>Banka Tanıtım sayfası burada olacak.</div>;
       case 'onayBekleyenCari':
         return <OnayBekleyenCari theme={theme} />;
       default:
@@ -118,18 +120,26 @@ const Dashboard = ({ userEmail, onSignOut }) => {
                     </button>
                   </li>
                   <li>
-                    <button onClick={() => setActiveSection('musteriListesi')}>
-                      Cari Tanıtım
+                  <button onClick={() => setActiveSection('bankaTanitma')}>
+                      Banka Tanıtım
                     </button>
                   </li>
                   <li>
-                    <button onClick={() => setActiveSection('onayBekleyenCari')}>
+                    <li>
+                      <button onClick={() => setActiveSection('musteriListesi')}>
+                      Cari Tanıtım
+                    </button>
+                    
+                  </li>
+                  <button onClick={() => setActiveSection('onayBekleyenCari')}>
                       Onay Bekleyen Cari Tanıtım
                       {pendingCustomerCount > 0 && (
                         <span className="notification-badge">{pendingCustomerCount}</span>
                       )}
                     </button>
+                    
                   </li>
+                  
                 </ul>
               )}
             </li>

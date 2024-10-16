@@ -6,6 +6,7 @@ const MakineTanımlama = () => {
   const [machines, setMachines] = useState([]);
   const [newMachineName, setNewMachineName] = useState('');
   const [newMachinePlate, setNewMachinePlate] = useState('');
+  const [newMachinePrice, setNewMachinePrice] = useState(''); // New State for Birim Fiyat
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
@@ -15,7 +16,7 @@ const MakineTanımlama = () => {
     fetchMachines();
   }, []);
 
-  // Makine verilerini Firestore'dan çekme
+  // Fetch machine data from Firestore
   const fetchMachines = async () => {
     setLoading(true);
     const db = getFirestore();
@@ -33,10 +34,10 @@ const MakineTanımlama = () => {
     }
   };
 
-  // Yeni makine ekleme
+  // Add new machine
   const addMachine = async () => {
-    if (!newMachineName || !newMachinePlate) {
-      setError('Lütfen makine kodu ve detay giriniz.');
+    if (!newMachineName || !newMachinePlate || !newMachinePrice) {
+      setError('Lütfen tüm bilgileri doldurunuz.');
       return;
     }
 
@@ -45,9 +46,11 @@ const MakineTanımlama = () => {
       await addDoc(collection(db, 'makineListesi'), {
         MakineAdı: newMachineName,
         MakinePlakası: newMachinePlate,
+        BirimFiyat: newMachinePrice, // Save Birim Fiyat in Firestore
       });
       setNewMachineName('');
       setNewMachinePlate('');
+      setNewMachinePrice(''); // Clear input
       setSuccessMessage('Yeni makine başarıyla eklendi.');
       fetchMachines();
     } catch (error) {
@@ -55,7 +58,7 @@ const MakineTanımlama = () => {
     }
   };
 
-  // Makine silme
+  // Delete machine
   const deleteMachine = async (machineId) => {
     const db = getFirestore();
     try {
@@ -67,20 +70,20 @@ const MakineTanımlama = () => {
     }
   };
 
-  // Makine düzenleme modunu aç
+  // Start editing machine
   const startEditing = (machine) => {
     setEditingMachine({ ...machine });
   };
 
-  // Düzenleme iptal
+  // Cancel editing
   const cancelEditing = () => {
     setEditingMachine(null);
   };
 
-  // Makine güncelleme
+  // Update machine
   const updateMachine = async () => {
-    if (!editingMachine.MakineAdı || !editingMachine.MakinePlakası) {
-      setError('Lütfen makine kodu ve detay giriniz.');
+    if (!editingMachine.MakineAdı || !editingMachine.MakinePlakası || !editingMachine.BirimFiyat) {
+      setError('Lütfen tüm bilgileri doldurunuz.');
       return;
     }
 
@@ -89,6 +92,7 @@ const MakineTanımlama = () => {
       await updateDoc(doc(db, 'makineListesi', editingMachine.id), {
         MakineAdı: editingMachine.MakineAdı,
         MakinePlakası: editingMachine.MakinePlakası,
+        BirimFiyat: editingMachine.BirimFiyat, // Update Birim Fiyat
       });
       setSuccessMessage('Makine başarıyla güncellendi.');
       setEditingMachine(null);
@@ -102,7 +106,7 @@ const MakineTanımlama = () => {
     <div className="makine-tanımlama-container">
       <h2>Makine Tanımlama</h2>
 
-      {/* Makine Ekleme Formu */}
+      {/* Machine Add Form */}
       <div className="add-machine-form">
         <h3>Yeni Makine Ekle</h3>
         <input
@@ -117,14 +121,20 @@ const MakineTanımlama = () => {
           value={newMachinePlate}
           onChange={(e) => setNewMachinePlate(e.target.value)}
         />
+        <input
+          type="text"
+          placeholder="Birim Fiyat"
+          value={newMachinePrice}
+          onChange={(e) => setNewMachinePrice(e.target.value)}
+        />
         <button onClick={addMachine}>Makine Ekle</button>
       </div>
 
-      {/* Başarı veya Hata Mesajı */}
+      {/* Success or Error Message */}
       {successMessage && <p className="success-message">{successMessage}</p>}
       {error && <p className="error-message">{error}</p>}
 
-      {/* Makine Listesi */}
+      {/* Machine List */}
       {loading ? (
         <p>Yükleniyor...</p>
       ) : (
@@ -133,6 +143,7 @@ const MakineTanımlama = () => {
             <tr>
               <th>Makine Kodu</th>
               <th>Makine Detayı</th>
+              <th>Birim Fiyat</th> {/* New Column */}
               <th>İşlemler</th>
             </tr>
           </thead>
@@ -169,6 +180,22 @@ const MakineTanımlama = () => {
                     />
                   ) : (
                     machine.MakinePlakası
+                  )}
+                </td>
+                <td>
+                  {editingMachine && editingMachine.id === machine.id ? (
+                    <input
+                      type="text"
+                      value={editingMachine.BirimFiyat}
+                      onChange={(e) =>
+                        setEditingMachine({
+                          ...editingMachine,
+                          BirimFiyat: e.target.value,
+                        })
+                      }
+                    />
+                  ) : (
+                    machine.BirimFiyat
                   )}
                 </td>
                 <td>

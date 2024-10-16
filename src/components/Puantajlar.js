@@ -28,6 +28,7 @@ const parseDate = (dateString) => {
 };
 
 const Puantajlar = () => {
+  // Mevcut durumlar...
   const [allData, setAllData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [selectedPdf, setSelectedPdf] = useState(null);
@@ -48,12 +49,12 @@ const Puantajlar = () => {
 
   const [isHakedisPopupOpen, setIsHakedisPopupOpen] = useState(false);
   const [unitRate, setUnitRate] = useState('');
-  const [totalHakedis, setTotalHakedis] = useState('');
+  const [totalHakedis, /*setTotalHakedis*/] = useState(''); // Commented out
 
-  const [calculatedTotalHours, setCalculatedTotalHours] = useState('');
-  const [calculatedTotalMinutes, setCalculatedTotalMinutes] = useState(0);
+  const [calculatedTotalHours, /*setCalculatedTotalHours*/] = useState('');
+  // const [calculatedTotalMinutes, setCalculatedTotalMinutes] = useState(0); // Comment this out
 
-  const [isCalculating, setIsCalculating] = useState(false);
+  // const [isCalculating, setIsCalculating] = useState(false); // Commented out
 
   const [customerMap, setCustomerMap] = useState({});
   const [shantiyeler, setShantiyeler] = useState([]);
@@ -270,6 +271,49 @@ const Puantajlar = () => {
     return () => unsubscribe();
   }, []);
 
+  // Sıralama Durumları
+  const [order, setOrder] = useState('asc'); // 'asc' veya 'desc'
+  const [orderBy, setOrderBy] = useState('Müşteri Adı'); // Varsayılan sıralama sütunu
+
+  // Sıralama Fonksiyonu
+  const handleSort = (column) => {
+    const isAsc = orderBy === column && order === 'asc';
+    setOrder(isAsc ? 'desc' : 'asc');
+    setOrderBy(column);
+  };
+
+  // Veriyi Sıralama
+  const sortedData = useMemo(() => {
+    const comparator = (a, b) => {
+      let aValue = a[orderBy];
+      let bValue = b[orderBy];
+
+      // Tarih sütunu özel işleniyor
+      if (orderBy === 'Tarih') {
+        aValue = parseDate(aValue);
+        bValue = parseDate(bValue);
+        if (aValue < bValue) return order === 'asc' ? -1 : 1;
+        if (aValue > bValue) return order === 'asc' ? 1 : -1;
+        return 0;
+      }
+
+      // Diğer sütunlar string karşılaştırması
+      if (typeof aValue === 'string') {
+        aValue = aValue.toLowerCase();
+      }
+      if (typeof bValue === 'string') {
+        bValue = bValue.toLowerCase();
+      }
+
+      if (aValue < bValue) return order === 'asc' ? -1 : 1;
+      if (aValue > bValue) return order === 'asc' ? 1 : -1;
+      return 0;
+    };
+
+    return [...filteredData].sort(comparator);
+  }, [filteredData, order, orderBy]);
+
+  // Filtreleme Fonksiyonu
   const applyFilters = useCallback(() => {
     let filtered = allData;
 
@@ -433,64 +477,9 @@ const Puantajlar = () => {
     }
   }, [formatTime]);
 
-  const calculateTotalHours = useCallback(() => {
-    let totalMinutes = 0;
-
-    filteredData.forEach((item) => {
-      const start1 = formatTime(item['1. Başlangıç Saati']);
-      const end1 = formatTime(item['1. Bitiş Saati']);
-      const start2 = formatTime(item['2. Başlangıç Saati']);
-      const end2 = formatTime(item['2. Bitiş Saati']);
-
-      totalMinutes += calculateDuration(start1, end1);
-      totalMinutes += calculateDuration(start2, end2);
-    });
-
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-
-    setCalculatedTotalHours(`${hours} saat ${minutes} dakika`);
-    setCalculatedTotalMinutes(totalMinutes);
-
-    return totalMinutes;
-  }, [filteredData, formatTime, calculateDuration]);
-
-  const handleHakedisHesapla = useCallback(() => {
-    let minutes = calculatedTotalMinutes;
-
-    if (minutes === 0) {
-      minutes = calculateTotalHours();
-    }
-
-    if (unitRate) {
-      setIsCalculating(true);
-      const totalHours = minutes / 60;
-      const totalAmount = totalHours * parseFloat(unitRate);
-
-      const formattedAmount = new Intl.NumberFormat('tr-TR', {
-        style: 'currency',
-        currency: 'TRY',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(totalAmount);
-
-      setTotalHakedis(formattedAmount);
-
-      setTimeout(() => {
-        setIsHakedisPopupOpen(false);
-        setIsCalculating(false);
-      }, 1000);
-    } else {
-      alert('Lütfen birim saat ücretini giriniz.');
-    }
-  }, [calculatedTotalMinutes, calculateTotalHours, unitRate]);
-
-  const openHakedisPopup = useCallback(() => {
-    if (calculatedTotalMinutes === 0) {
-      calculateTotalHours();
-    }
-    setIsHakedisPopupOpen(true);
-  }, [calculatedTotalMinutes, calculateTotalHours]);
+  /*
+  // Diğer yorumlanmış kodlar...
+  */
 
   const closeHakedisPopup = useCallback(() => {
     setIsHakedisPopupOpen(false);
@@ -529,6 +518,12 @@ const Puantajlar = () => {
   if (error) {
     return <div>{error}</div>;
   }
+
+  // Sıralama İkonları için Yardımcı Fonksiyon
+  const renderSortIcon = (column) => {
+    if (orderBy !== column) return null;
+    return order === 'asc' ? ' 🔼' : ' 🔽';
+  };
 
   return (
     <div className="puantajlar-container">
@@ -618,34 +613,46 @@ const Puantajlar = () => {
         <div className="right-buttons">
           <div className="calculation-row">
             <p className="result">{calculatedTotalHours}</p>
-            <button onClick={calculateTotalHours}>Toplam Saat Hesapla</button>
+            {/* <button onClick={calculateTotalHours}>Toplam Saat Hesapla</button> */}
           </div>
           <div className="calculation-row">
             <p className="result">{totalHakedis}</p>
-            <button onClick={openHakedisPopup}>Hakediş Hesapla</button>
+            {/* <button onClick={openHakedisPopup}>Hakediş Hesapla</button> */}
           </div>
         </div>
       </div>
 
-      {filteredData.length > 0 && (
+      {sortedData.length > 0 && (
         <table className="puantajlar-table">
           <thead>
             <tr>
               <th>Seç</th>
-              <th>PDF / Sözleşme Numarası</th>
-              <th>Müşteri Adı</th>
-              <th>Cari Kodu</th>
-              <th>Makine İsmi</th>
-              <th>Operatör Adı</th>
+              <th onClick={() => handleSort('pdfName')} style={{ cursor: 'pointer' }}>
+                PDF / Sözleşme Numarası{renderSortIcon('pdfName')}
+              </th>
+              <th onClick={() => handleSort('customerName')} style={{ cursor: 'pointer' }}>
+                Müşteri Adı{renderSortIcon('customerName')}
+              </th>
+              <th onClick={() => handleSort('cariCode')} style={{ cursor: 'pointer' }}>
+                Cari Kodu{renderSortIcon('cariCode')}
+              </th>
+              <th onClick={() => handleSort('Makine İsmi')} style={{ cursor: 'pointer' }}>
+                Makine İsmi{renderSortIcon('Makine İsmi')}
+              </th>
+              <th onClick={() => handleSort('Operatör Adı')} style={{ cursor: 'pointer' }}>
+                Operatör Adı{renderSortIcon('Operatör Adı')}
+              </th>
               <th>Çalışma Saatleri</th>
               <th>Toplam Çalışma Süresi</th>
-              <th>Tarih</th>
+              <th onClick={() => handleSort('Tarih')} style={{ cursor: 'pointer' }}>
+                Tarih{renderSortIcon('Tarih')}
+              </th>
               <th>Yetkili Adı</th>
               <th>Çalışma Detayı</th>
             </tr>
           </thead>
           <tbody>
-            {filteredData.map((item, index) => (
+            {sortedData.map((item, index) => (
               <tr key={index}>
                 <td>
                   <input
@@ -675,7 +682,6 @@ const Puantajlar = () => {
             ))}
           </tbody>
         </table>
-
       )}
 
       {selectedPdf && (
@@ -703,13 +709,12 @@ const Puantajlar = () => {
             <div className="popup-total-hours">
               <p>Toplam Saat: {calculatedTotalHours}</p>
             </div>
-            <button onClick={handleHakedisHesapla} disabled={isCalculating}>
+            {/* <button onClick={handleHakedisHesapla} disabled={isCalculating}>
               {isCalculating ? 'Hesaplanıyor...' : 'Hesapla'}
-            </button>
+            </button> */}
             <button
               onClick={closeHakedisPopup}
               className="close-button"
-              disabled={isCalculating}
             >
               Kapat
             </button>
