@@ -1,16 +1,19 @@
-import './Dashboard.css'; 
+import './Dashboard.css';
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Moon, Sun, ChevronDown, ChevronUp } from 'lucide-react';
-import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore'; 
-import { database } from './firebaseConfig'; 
+import { User, Moon, Sun, ChevronDown, ChevronUp, Building2, LogOut } from 'lucide-react';
+import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { database } from './firebaseConfig';
+import { useNavigate } from 'react-router-dom';
 import OperatorEkle from './OperatorEkle';
 import Puantajlar from './Puantajlar';
-import MusteriListesi from './MusteriListesi'; 
+import MusteriListesi from './MusteriListesi';
 import MakineTanımlama from './MakineTanımlama';
 import OnayBekleyenCari from './OnayBekleyenCari';
 import FirmaBilgileriGuncelle from './FirmaBilgileriGuncelle';
+import Raporlama from './Raporlama'; // Yeni eklenen import
 
 const Dashboard = ({ userEmail, onSignOut }) => {
+  const navigate = useNavigate();
   const [theme, setTheme] = useState('light');
   const [activeSection, setActiveSection] = useState('home');
   const [pendingCustomerCount, setPendingCustomerCount] = useState(0);
@@ -75,6 +78,14 @@ const Dashboard = ({ userEmail, onSignOut }) => {
     setUserData(updatedData);
   };
 
+  const handleSignOutClick = () => {
+    const isConfirmed = window.confirm('Çıkış yapmak istediğinize emin misiniz?');
+    if (isConfirmed) {
+      onSignOut();
+      navigate('/');
+    }
+  };
+
   const renderContent = () => {
     switch (activeSection) {
       case 'operatorEkle':
@@ -82,7 +93,7 @@ const Dashboard = ({ userEmail, onSignOut }) => {
       case 'puantajlar':
         return <Puantajlar />;
       case 'raporlama':
-        return <div>Raporlama sayfası burada olacak.</div>;
+        return <Raporlama theme={theme} />; // Theme prop'unu ekledik
       case 'makineTanitma':
         return <MakineTanımlama />;
       case 'musteriListesi':
@@ -113,14 +124,28 @@ const Dashboard = ({ userEmail, onSignOut }) => {
           <span>{userData ? userData.companyName : userEmail}</span>
         </div>
         <div className="topbar-actions">
-          <button onClick={handleFirmaBilgileriClick} className="firma-bilgileri-button">
-            Firma Bilgileri
+          <button 
+            onClick={handleFirmaBilgileriClick} 
+            className="action-button firma-bilgileri-button"
+            title="Firma Bilgileri"
+          >
+            <Building2 size={18} />
+            <span>Firma Bilgileri</span>
           </button>
-          <button onClick={toggleTheme} className="theme-toggle">
-            {theme === 'light' ? <Moon size={24} /> : <Sun size={24} />}
+          <button 
+            onClick={toggleTheme} 
+            className="action-button theme-toggle"
+            title={theme === 'light' ? 'Karanlık Mod' : 'Aydınlık Mod'}
+          >
+            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
           </button>
-          <button onClick={onSignOut} className="sign-out">
-            Sign Out
+          <button 
+            onClick={handleSignOutClick} 
+            className="action-button sign-out"
+            title="Çıkış Yap"
+          >
+            <LogOut size={18} />
+            <span>Çıkış</span>
           </button>
         </div>
       </div>
@@ -180,9 +205,7 @@ const Dashboard = ({ userEmail, onSignOut }) => {
           <div className="hops-text">HOPS</div>
         </div>
 
-        <div className="content">
-          {renderContent()}
-        </div>
+        <div className="content">{renderContent()}</div>
       </div>
 
       {showFirmaBilgileri && (

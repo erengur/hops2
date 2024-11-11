@@ -1,3 +1,4 @@
+// Login.js - Bu dosya aynı kalacak
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
@@ -14,8 +15,8 @@ const Login = ({ setEmail }) => {
     e.preventDefault();
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      setEmail(email); // Kullanıcı e-postasını Dashboard'a gönderiyoruz
-      navigate('/dashboard'); // Giriş başarılı, dashboard ekranına yönlendir
+      setEmail(email);
+      navigate('/dashboard');
     } catch (error) {
       setMessage('Giriş başarısız: ' + error.message);
     }
@@ -41,10 +42,14 @@ const Login = ({ setEmail }) => {
           required
           className="login-input"
         />
-        <button type="submit" className="login-button">Giriş Yap</button>
+        <button type="submit" className="login-button">
+          Giriş Yap
+        </button>
         {message && <p className="login-message">{message}</p>}
       </form>
-      <button onClick={() => navigate('/signup')} className="signup-button">Kayıt Ol</button>
+      <button onClick={() => navigate('/signup')} className="signup-button">
+        Kayıt Ol
+      </button>
     </div>
   );
 };

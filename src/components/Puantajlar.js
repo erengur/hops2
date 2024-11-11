@@ -596,92 +596,106 @@ const Puantajlar = () => {
               classNamePrefix="react-select"
             />
           </div>
+        </div>
 
-          <div className="button-group">
-            <button onClick={handleSelectAll}>Hepsini Seç</button>
-            <button onClick={handleDeselectAll}>Seçimleri Kaldır</button>
-            <button
-              onClick={handleDownloadSelected}
-              disabled={selectedPdfs.length === 0}
-              className="download-button-inline"
-            >
-              Seçili PDF'leri İndir
-            </button>
-          </div>
+        <div className="button-group">
+          <button onClick={handleSelectAll}>Hepsini Seç</button>
+          <button onClick={handleDeselectAll}>Seçimleri Kaldır</button>
+          <button
+            onClick={handleDownloadSelected}
+            disabled={selectedPdfs.length === 0}
+            className="download-button-inline"
+          >
+            Seçili PDF'leri İndir
+          </button>
         </div>
 
         <div className="right-buttons">
           <div className="calculation-row">
             <p className="result">{calculatedTotalHours}</p>
-            {/* <button onClick={calculateTotalHours}>Toplam Saat Hesapla</button> */}
           </div>
           <div className="calculation-row">
             <p className="result">{totalHakedis}</p>
-            {/* <button onClick={openHakedisPopup}>Hakediş Hesapla</button> */}
           </div>
         </div>
       </div>
 
       {sortedData.length > 0 && (
-        <table className="puantajlar-table">
-          <thead>
-            <tr>
-              <th>Seç</th>
-              <th onClick={() => handleSort('pdfName')} style={{ cursor: 'pointer' }}>
-                PDF / Sözleşme Numarası{renderSortIcon('pdfName')}
-              </th>
-              <th onClick={() => handleSort('customerName')} style={{ cursor: 'pointer' }}>
-                Müşteri Adı{renderSortIcon('customerName')}
-              </th>
-              <th onClick={() => handleSort('cariCode')} style={{ cursor: 'pointer' }}>
-                Cari Kodu{renderSortIcon('cariCode')}
-              </th>
-              <th onClick={() => handleSort('Makine İsmi')} style={{ cursor: 'pointer' }}>
-                Makine İsmi{renderSortIcon('Makine İsmi')}
-              </th>
-              <th onClick={() => handleSort('Operatör Adı')} style={{ cursor: 'pointer' }}>
-                Operatör Adı{renderSortIcon('Operatör Adı')}
-              </th>
-              <th>Çalışma Saatleri</th>
-              <th>Toplam Çalışma Süresi</th>
-              <th onClick={() => handleSort('Tarih')} style={{ cursor: 'pointer' }}>
-                Tarih{renderSortIcon('Tarih')}
-              </th>
-              <th>Yetkili Adı</th>
-              <th>Çalışma Detayı</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedData.map((item, index) => (
-              <tr key={index}>
-                <td>
-                  <input
-                    type="checkbox"
-                    onChange={() => handleCheckboxChange(item.pdfName)}
-                    checked={selectedPdfs.includes(item.pdfName)}
-                  />
-                </td>
-                <td>
-                  <button
-                    className="link-button"
-                    onClick={() => handlePdfClick(item.pdfRef, item.pdfName)}
-                  >
-                    {item.pdfName}
-                  </button>
-                </td>
-                <td>{item.customerName || '-'}</td>
-                <td>{item.cariCode || '-'}</td>
-                <td>{item['Makine İsmi'] || '-'}</td>
-                <td>{item['Operatör Adı'] || '-'}</td>
-                <td>{renderWorkHours(item)}</td>
-                <td>{calculateTotalWorkDuration(item)}</td>
-                <td>{item['Tarih'] || '-'}</td>
-                <td>{item['Yetkili Adı'] || '-'}</td>
-                <td>{item['Çalışma Detayı'] || '-'}</td>
+        <div className="table-container">
+          <table className="puantajlar-table">
+            <thead>
+              <tr>
+                <th>Seç</th>
+                <th onClick={() => handleSort('pdfName')} style={{ cursor: 'pointer' }}>
+                  PDF / Sözleşme No {renderSortIcon('pdfName')}
+                </th>
+                <th onClick={() => handleSort('customerName')} style={{ cursor: 'pointer' }}>
+                  Müşteri {renderSortIcon('customerName')}
+                </th>
+                <th onClick={() => handleSort('cariCode')} style={{ cursor: 'pointer' }}>
+                  Cari Kod {renderSortIcon('cariCode')}
+                </th>
+                <th onClick={() => handleSort('Makine İsmi')} style={{ cursor: 'pointer' }}>
+                  Makine {renderSortIcon('Makine İsmi')}
+                </th>
+                <th onClick={() => handleSort('Operatör Adı')} style={{ cursor: 'pointer' }}>
+                  Operatör {renderSortIcon('Operatör Adı')}
+                </th>
+                <th onClick={() => handleSort('Tarih')} style={{ cursor: 'pointer' }}>
+                  Tarih {renderSortIcon('Tarih')}
+                </th>
+                <th>Detaylar</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {sortedData.map((item, index) => (
+                <tr key={index}>
+                  <td data-label="Seç" className="priority">
+                    <input
+                      type="checkbox"
+                      onChange={() => handleCheckboxChange(item.pdfName)}
+                      checked={selectedPdfs.includes(item.pdfName)}
+                    />
+                  </td>
+                  <td data-label="PDF / Sözleşme No" className="priority">
+                    <button
+                      className="link-button"
+                      onClick={() => handlePdfClick(item.pdfRef, item.pdfName)}
+                    >
+                      {item.pdfName}
+                    </button>
+                  </td>
+                  <td data-label="Müşteri" className="priority">
+                    {item.customerName || '-'}
+                  </td>
+                  <td data-label="Cari Kod" className="priority cari-code">
+                    {item.cariCode || '-'}
+                  </td>
+                  <td data-label="Makine" className="priority">
+                    {item['Makine İsmi'] || '-'}
+                  </td>
+                  <td data-label="Operatör" className="priority">
+                    {item['Operatör Adı'] || '-'}
+                  </td>
+                  <td data-label="Tarih" className="priority">
+                    {item['Tarih'] || '-'}
+                  </td>
+                  <td data-label="Detaylar">
+                    <div className="work-details">
+                      <strong>Çalışma Saatleri:</strong> {renderWorkHours(item)}
+                      <br />
+                      <strong>Toplam Süre:</strong> {calculateTotalWorkDuration(item)}
+                      <br />
+                      <strong>Yetkili:</strong> {item['Yetkili Adı'] || '-'}
+                      <br />
+                      <strong>Detay:</strong> {item['Çalışma Detayı'] || '-'}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {selectedPdf && (
@@ -709,13 +723,7 @@ const Puantajlar = () => {
             <div className="popup-total-hours">
               <p>Toplam Saat: {calculatedTotalHours}</p>
             </div>
-            {/* <button onClick={handleHakedisHesapla} disabled={isCalculating}>
-              {isCalculating ? 'Hesaplanıyor...' : 'Hesapla'}
-            </button> */}
-            <button
-              onClick={closeHakedisPopup}
-              className="close-button"
-            >
+            <button onClick={closeHakedisPopup} className="close-button">
               Kapat
             </button>
           </div>

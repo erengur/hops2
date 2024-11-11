@@ -26,9 +26,10 @@ body.dark-theme {
 
 /* Topbar */
 .topbar {
-  background-color: #f1f3f5;
+  background-color: #ffffff;
   color: #333;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid #e9ecef;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
   height: 64px;
   display: flex;
   justify-content: space-between;
@@ -44,6 +45,7 @@ body.dark-theme {
 body.dark-theme .topbar {
   background-color: #1a1a1a;
   color: #f1f1f1;
+  border-bottom: 1px solid #2d2d2d;
 }
 
 .user-info {
@@ -60,21 +62,99 @@ body.dark-theme .topbar {
   white-space: nowrap;
 }
 
+/* Topbar Actions için güncellenen stiller */
 .topbar-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 15px;
 }
 
-.theme-toggle, .sign-out {
-  color: #f1f1f1;
-  background: #007bff;
-  border: none;
-  cursor: pointer;
-  padding: 5px;
+.action-button {
   display: flex;
   align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap; /* Yazının alt satıra geçmesini engeller */
+}
+
+.action-button svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0; /* İkonun küçülmesini engeller */
+}
+
+/* Firma bilgileri butonu için özel genişlik */
+.firma-bilgileri-button {
+  background-color: #28a745;
+  color: white;
+  min-width: 140px; /* Minimum genişlik belirliyoruz */
+  justify-content: center; /* İçeriği ortalar */
+}
+
+.firma-bilgileri-button:hover {
+  background-color: #218838;
+  transform: translateY(-1px);
+}
+
+/* Diğer butonlar için ek stil */
+.theme-toggle {
+  background-color: #6c757d;
+  color: white;
+  padding: 8px;
+  border-radius: 8px;
+  min-width: 40px; /* Tema butonu için minimum genişlik */
   justify-content: center;
+}
+
+.sign-out {
+  background-color: #dc3545;
+  color: white;
+  min-width: 100px; /* Çıkış butonu için minimum genişlik */
+  justify-content: center;
+}
+
+/* Responsive tasarım güncellendi */
+@media (max-width: 768px) {
+  .topbar-actions {
+    gap: 8px;
+  }
+
+  .action-button {
+    padding: 8px;
+    min-width: auto; /* Mobilde minimum genişliği kaldır */
+  }
+
+  .action-button span {
+    display: none; /* Mobilde yazıları gizle */
+  }
+
+  .action-button svg {
+    margin: 0; /* Mobilde icon margin'i sıfırla */
+  }
+}
+
+/* Dark tema için buton stilleri aynı kalacak */
+body.dark-theme .firma-bilgileri-button {
+  background-color: #28a745;
+}
+
+body.dark-theme .theme-toggle {
+  background-color: #495057;
+}
+
+body.dark-theme .sign-out {
+  background-color: #dc3545;
+}
+
+.sign-out:hover {
+  background-color: #c82333;
+  transform: translateY(-1px);
 }
 
 /* Leftbar */
@@ -139,21 +219,7 @@ body.dark-theme .leftbar {
   padding: 20px;
 }
 
-.operator-button {
-  background-color: #007bff;
-  color: white;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  margin-top: 20px;
-}
-
-.operator-button:hover {
-  background-color: #0056b3;
-}
-
-/* Yeni dropdown menü stilleri */
+/* Dropdown menü stilleri */
 .leftbar .dropdown {
   position: relative;
 }
@@ -163,6 +229,9 @@ body.dark-theme .leftbar {
   justify-content: space-between;
   align-items: center;
   width: 100%;
+  background-color: #444;
+  border-radius: 5px;
+  padding: 10px;
 }
 
 .leftbar .dropdown-menu {
@@ -174,18 +243,6 @@ body.dark-theme .leftbar {
 .leftbar .dropdown-menu button {
   font-size: 16px;
   padding: 8px 0;
-}
-
-/* Menü öğeleri arasındaki boşluğu artır */
-.leftbar ul > li {
-  margin-bottom: 15px;
-}
-
-/* Dropdown menüsü için özel stil */
-.leftbar .dropdown > button {
-  background-color: #444;
-  border-radius: 5px;
-  padding: 10px;
 }
 
 body.dark-theme .leftbar .dropdown > button {
@@ -200,7 +257,7 @@ body.dark-theme .leftbar .dropdown > button:hover {
   background-color: #444;
 }
 
-/* İki satırlı buton için yeni stiller */
+/* İki satırlı buton için stiller */
 .leftbar .two-line-button {
   width: 100%;
   padding: 10px;
@@ -235,7 +292,7 @@ body.dark-theme .leftbar .dropdown > button:hover {
   opacity: 0.8;
 }
 
-/* Bildirim rozeti için güncellenmiş stiller */
+/* Bildirim rozeti */
 .notification-badge {
   background-color: #dc3545;
   color: white;
@@ -251,7 +308,7 @@ body.dark-theme .leftbar .dropdown > button:hover {
   font-weight: bold;
 }
 
-/* Yeni stiller */
+/* Logo ve diğer stiller */
 .company-logo {
   width: 32px;
   height: 32px;
@@ -260,28 +317,27 @@ body.dark-theme .leftbar .dropdown > button:hover {
   margin-right: 10px;
 }
 
-/* Yeni eklenen Firma Bilgileri butonu için stil */
-.firma-bilgileri-button {
-  background-color: #28a745;
-  color: white;
-  border: none;
-  padding: 5px 10px;
-  border-radius: 5px;
-  cursor: pointer;
-  margin-right: 10px;
-}
-
-.firma-bilgileri-button:hover {
-  background-color: #218838;
-}
-
-/* HOPS yazısı için yeni stil */
+/* HOPS yazısı */
 .hops-text {
   font-size: 48px;
   font-weight: bold;
   color: rgb(240 248 255);
-
   text-align: center;
   padding: 20px 0;
   margin-top: auto;
+}
+
+/* Responsive tasarım */
+@media (max-width: 768px) {
+  .topbar-actions {
+    gap: 8px;
+  }
+
+  .action-button {
+    padding: 6px 12px;
+  }
+
+  .firma-bilgileri-button span {
+    display: none;
+  }
 }

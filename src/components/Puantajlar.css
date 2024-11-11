@@ -1,5 +1,3 @@
-/* Puantajlar.css */
-
 /* Temel stil değişkenleri */
 :root {
   --bg-color: #f9f9f9;
@@ -177,16 +175,7 @@
   align-items: center;
   gap: 10px;
 }
-/*
-.calculation-row .result {
-  min-width: 150px;
-  padding: 8px;
-  background-color: #e9ecef;
-  border-radius: 4px;
-  font-size: 14px;
-  text-align: center;
-}
-*/
+
 .calculation-row button {
   padding: 8px 12px;
   background-color: #28a745;
@@ -202,11 +191,20 @@
   background-color: #218838;
 }
 
+/* Table Container */
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
 /* Puantajlar Table */
 .puantajlar-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 20px;
+  min-width: 600px;
 }
 
 .puantajlar-table th,
@@ -220,14 +218,18 @@
   background-color: var(--table-header-bg);
   font-weight: bold;
   color: #fff;
+  white-space: nowrap;
 }
 
 .puantajlar-table tr:nth-child(even) {
   background-color: var(--table-row-bg);
 }
 
-.puantajlar-table tr:hover {
-  background-color: var(--table-row-hover-bg);
+/* Cari Kod kolonu için özel stiller */
+.puantajlar-table th:nth-child(4),
+.puantajlar-table td:nth-child(4) {
+  min-width: 120px;
+  text-align: left;
 }
 
 /* Tik Kutuları (Checkbox) */
@@ -363,8 +365,43 @@ input[type="checkbox"]:checked::before {
   background-color: #c82333;
 }
 
+/* Work Details */
+.work-details {
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+
+.work-details strong {
+  color: #555;
+}
+
 /* Responsive Design */
+@media (max-width: 1400px) {
+  .puantajlar-table {
+    font-size: 14px;
+  }
+  
+  .puantajlar-table th,
+  .puantajlar-table td {
+    padding: 8px;
+  }
+
+  .puantajlar-table th:nth-child(4),
+  .puantajlar-table td:nth-child(4) {
+    min-width: 100px;
+  }
+}
+
 @media (max-width: 1200px) {
+  .puantajlar-table {
+    font-size: 13px;
+  }
+  
+  .puantajlar-table th,
+  .puantajlar-table td {
+    padding: 6px;
+  }
+
   .filters-row {
     flex-direction: column;
   }
@@ -379,6 +416,34 @@ input[type="checkbox"]:checked::before {
   .right-buttons {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .puantajlar-table th:nth-child(4),
+  .puantajlar-table td:nth-child(4) {
+    min-width: 90px;
+  }
+}
+
+@media (max-width: 992px) {
+  .puantajlar-table {
+    font-size: 12px;
+  }
+  
+  .puantajlar-table th,
+  .puantajlar-table td {
+    padding: 5px;
+  }
+  
+  .puantajlar-table td {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .puantajlar-table th:nth-child(4),
+  .puantajlar-table td:nth-child(4) {
+    min-width: 80px;
   }
 }
 
@@ -399,4 +464,91 @@ input[type="checkbox"]:checked::before {
     width: 95%;
     height: 95%;
   }
+
+  .puantajlar-table {
+    font-size: 11px;
+  }
+  
+  .puantajlar-table th,
+  .puantajlar-table td {
+    padding: 4px;
+  }
+  
+  .puantajlar-table td {
+    max-width: 120px;
+  }
+  
+  .puantajlar-table input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+  }
+  
+  input[type="checkbox"]:checked::before {
+    font-size: 12px;
+    left: 2px;
+  }
+
+  .puantajlar-table th:nth-child(4),
+  .puantajlar-table td:nth-child(4) {
+    min-width: 70px;
+  }
+}
+
+@media (max-width: 576px) {
+  .puantajlar-table {
+    font-size: 10px;
+  }
+  
+  .puantajlar-table th,
+  .puantajlar-table td {
+    padding: 3px;
+  }
+  
+  .puantajlar-table td {
+    max-width: 100px;
+  }
+  
+  .puantajlar-table input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+  }
+  
+  input[type="checkbox"]:checked::before {
+    font-size: 10px;
+    left: 2px;
+  }
+
+  .puantajlar-table th:nth-child(4),
+  .puantajlar-table td:nth-child(4) {
+    min-width: 60px;
+  }
+}
+
+/* Hover efektleri */
+@media (hover: hover) {
+  .puantajlar-table tr:hover {
+    background-color: var(--table-row-hover-bg);
+  }
+}
+
+/* Tooltip desteği */
+.puantajlar-table td[title] {
+  cursor: help;
+}
+
+/* Özel sütun genişlikleri */
+.puantajlar-table th:first-child,
+.puantajlar-table td:first-child {
+  width: 40px;
+}
+
+.puantajlar-table th:nth-child(2),
+.puantajlar-table td:nth-child(2) {
+  min-width: 100px;
+}
+
+/* PDF Link butonları */
+.link-button {
+  font-size: inherit;
+  padding: 2px 4px;
 }
