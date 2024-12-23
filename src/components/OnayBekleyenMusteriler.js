@@ -18,7 +18,7 @@ import DeleteCustomerModal from './DeleteCustomerModal';
 import DeleteSantiyeModal from './DeleteSantiyeModal';
 import TransferCustomerModal from './TransferCustomerModal';
 
-const OnayBekleyenCari = () => {
+const OnayBekleyenMusteriler = () => {
   const [pendingCustomers, setPendingCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -50,10 +50,7 @@ const OnayBekleyenCari = () => {
           parentId: doc.data().parentId || null,
         }));
 
-        const pendingData = customerData.filter(customer => 
-          customer['Onay'] === 'Onay Bekliyor' ||
-          customer['Onay'] === 'Beklemede'
-        );
+        const pendingData = customerData.filter(customer => customer['Onay'] === 'Beklemede');
         setPendingCustomers(pendingData);
         
         const santiyeler = pendingData.filter(customer => customer.Şantiye);
@@ -71,27 +68,25 @@ const OnayBekleyenCari = () => {
     return () => unsubscribe();
   }, []);
 
-  const openEditModal = useCallback((customer) => {
+  const openEditModal = (customer) => {
     setSelectedCustomer(customer);
     setIsEditModalOpen(true);
-  }, []);
+  };
 
-  const openEditSantiyeModal = useCallback((santiye) => {
+  const openEditSantiyeModal = (santiye) => {
     setSelectedSantiye(santiye);
     setIsEditSantiyeModalOpen(true);
-  }, []);
+  };
 
-  const handleDelete = useCallback((customer) => {
-    console.log('Silme işlemi:', customer);
+  const openDeleteModal = (customer) => {
     setSelectedCustomer(customer);
     setIsDeleteModalOpen(true);
-  }, []);
+  };
 
-  const handleDeleteSantiye = useCallback((santiye) => {
-    console.log('Şantiye silme işlemi:', santiye);
+  const openDeleteSantiyeModal = (santiye) => {
     setSelectedSantiye(santiye);
     setIsDeleteSantiyeModalOpen(true);
-  }, []);
+  };
 
   const handleTransferSantiye = useCallback((santiye) => {
     console.log('Şantiye transfer işlemi:', santiye);
@@ -124,6 +119,16 @@ const OnayBekleyenCari = () => {
     }));
   };
 
+  const handleDelete = useCallback((customer) => {
+    console.log('Silme işlemi:', customer);
+    openDeleteModal(customer);
+  }, []);
+
+  const handleDeleteSantiye = useCallback((santiye) => {
+    console.log('Şantiye silme işlemi:', santiye);
+    openDeleteSantiyeModal(santiye);
+  }, []);
+
   if (loading) {
     return (
       <Container>
@@ -143,7 +148,7 @@ const OnayBekleyenCari = () => {
   return (
     <Container>
       <Typography variant="h4" gutterBottom>
-        Onay Bekleyen Cari Listesi
+        Onay Bekleyen Müşteriler
       </Typography>
 
       <CustomerTable
@@ -157,7 +162,6 @@ const OnayBekleyenCari = () => {
         type="pending"
       />
 
-      {/* Modallar */}
       <EditCustomerModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
@@ -238,4 +242,4 @@ const OnayBekleyenCari = () => {
   );
 };
 
-export default OnayBekleyenCari;
+export default OnayBekleyenMusteriler; 

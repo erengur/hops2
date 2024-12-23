@@ -17,6 +17,7 @@
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     color: var(--text-color);
     transition: background-color 0.3s ease, color 0.3s ease;
+    min-height: calc(100vh - 100px);
   }
   
   .raporlama-container h2 {
@@ -282,4 +283,50 @@
   
   .dark-theme .preview-table tr:hover {
     background-color: #404040;
+  }
+  
+  .raporlama-container.dark {
+    background-color: #1a1a1a;
+    color: #fff;
+  }
+  
+  .raporlama-container.dark .MuiPaper-root {
+    background-color: #2d2d2d;
+    color: #fff;
+  }
+  
+  .raporlama-container.dark .MuiTableCell-root {
+    color: #fff;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .raporlama-container.dark .MuiButton-outlined {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+  
+  .raporlama-container.dark .MuiButton-outlined:hover {
+    border-color: #fff;
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  .raporlama-container.light .MuiPaper-root {
+    background-color: #fff;
+  }
+  
+  .raporlama-container .MuiTableContainer-root {
+    margin-bottom: 20px;
+  }
+  
+  .raporlama-container .MuiTableCell-head {
+    font-weight: bold;
+    background-color: #f5f5f5;
+  }
+  
+  .raporlama-container.dark .MuiTableCell-head {
+    background-color: #3d3d3d;
+  }
+  
+  .raporlama-container .MuiButton-root {
+    min-width: 100px;
   }

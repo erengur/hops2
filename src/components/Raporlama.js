@@ -1,3 +1,5 @@
+// Raporlama.js
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { database } from './firebaseConfig';
@@ -20,12 +22,12 @@ const parseDate = (dateString) => {
 };
 
 const Raporlama = () => {
-  // React Hooks must be called at the top level
+  // Durum Yönetimi
   const [workData, setWorkData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Filtre durumları
+  // Filtre Durumları
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [customerOptions, setCustomerOptions] = useState([]);
@@ -35,16 +37,28 @@ const Raporlama = () => {
   const [operatorOptions, setOperatorOptions] = useState([]);
   const [selectedOperators, setSelectedOperators] = useState([]);
 
+  // Sıralama Durumları
+  const [order, setOrder] = useState('asc'); // 'asc' veya 'desc'
+  const [orderBy, setOrderBy] = useState('Müşteri Adı'); // Varsayılan sıralama sütunu
+
+  // Debounced Fonksiyonlar
   const debouncedSetStartDate = useMemo(
-    () => debounce((date) => setStartDate(date), 300),
+    () => debounce((date) => {
+      console.log('Setting start date:', date);
+      setStartDate(date);
+    }, 300),
     []
   );
 
   const debouncedSetEndDate = useMemo(
-    () => debounce((date) => setEndDate(date), 300),
+    () => debounce((date) => {
+      console.log('Setting end date:', date);
+      setEndDate(date);
+    }, 300),
     []
   );
 
+  // Zaman Formatlama Fonksiyonu
   const formatTime = useCallback((timeString) => {
     if (!timeString || timeString === '""') return null;
     const cleanTime = timeString.replace(/['"]/g, '').trim();
@@ -54,6 +68,7 @@ const Raporlama = () => {
     return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`;
   }, []);
 
+  // Süre Hesaplama Fonksiyonu
   const calculateDuration = useCallback((start, end) => {
     if (!start || !end) return 0;
     const [startHours, startMinutes] = start.split(':').map(Number);
@@ -65,23 +80,37 @@ const Raporlama = () => {
     return duration;
   }, []);
 
+  // Toplam Çalışma Saatini Hesaplama
   const calculateTotalWorkHours = useCallback((item) => {
     const start1 = formatTime(item['1. Başlangıç Saati']);
     const end1 = formatTime(item['1. Bitiş Saati']);
     const start2 = formatTime(item['2. Başlangıç Saati']);
     const end2 = formatTime(item['2. Bitiş Saati']);
 
-    const duration1 = start1 && end1 ? calculateDuration(start1, end1) : 0;
-    const duration2 = start2 && end2 ? calculateDuration(start2, end2) : 0;
+    console.log(`Calculating total work hours for item ID: ${item.id}`);
+    console.log('Start1:', start1, 'End1:', end1, 'Start2:', start2, 'End2:', end2);
+
+    // Geçerli saatlerin olup olmadığını kontrol edin
+    if ((!start1 || !end1) && (!start2 || !end2)) {
+      console.warn(`Item ID: ${item.id} has no valid working hours.`);
+      return 0;
+    }
+
+    const duration1 = (start1 && end1) ? calculateDuration(start1, end1) : 0;
+    const duration2 = (start2 && end2) ? calculateDuration(start2, end2) : 0;
 
     const totalMinutes = duration1 + duration2;
     const totalHours = totalMinutes / 60;
 
+    console.log(`Total minutes: ${totalMinutes}, Total hours: ${totalHours}`);
+
     return totalHours;
   }, [formatTime, calculateDuration]);
 
+  // Veri Çekme ve İşleme
   useEffect(() => {
     const fetchData = async () => {
+      console.log('Fetching data for Raporlama component.');
       try {
         const db = database;
 
@@ -101,6 +130,7 @@ const Raporlama = () => {
           .filter(option => option.value)
           .sort((a, b) => a.label.localeCompare(b.label));
         setCustomerOptions(customerOptionsArray);
+        console.log('Fetched customer options:', customerOptionsArray);
 
         // Makine listesini yükle
         const machineSnapshot = await getDocs(collection(db, 'makineListesi'));
@@ -118,6 +148,7 @@ const Raporlama = () => {
           .filter(option => option.value)
           .sort((a, b) => a.label.localeCompare(b.label));
         setMachineOptions(machineOptionsArray);
+        console.log('Fetched machine options:', machineOptionsArray);
 
         // Operatör listesini yükle
         const operatorSnapshot = await getDocs(collection(db, 'operatorListesi'));
@@ -134,6 +165,7 @@ const Raporlama = () => {
           .filter(option => option.value)
           .sort((a, b) => a.label.localeCompare(b.label));
         setOperatorOptions(operatorOptionsArray);
+        console.log('Fetched operator options:', operatorOptionsArray);
 
         // Puantaj verilerini yükle
         const puantajSnapshot = await getDocs(collection(db, 'puantajlar'));
@@ -143,6 +175,7 @@ const Raporlama = () => {
         }));
         setWorkData(puantajData);
         setLoading(false);
+        console.log('Fetched puantajlar data:', puantajData);
 
       } catch (error) {
         console.error('Veri yükleme hatası:', error);
@@ -154,7 +187,9 @@ const Raporlama = () => {
     fetchData();
   }, []);
 
+  // Veri Filtreleme
   const filteredData = useMemo(() => {
+    console.log('Applying filters to workData.');
     let filtered = workData;
 
     if (startDate && endDate) {
@@ -162,6 +197,7 @@ const Raporlama = () => {
         const itemDate = parseDate(item['Tarih']);
         return itemDate >= startDate && itemDate <= endDate;
       });
+      console.log(`Filtered by date range: ${startDate} - ${endDate}, ${filtered.length} records remaining.`);
     }
 
     if (selectedCustomers.length > 0) {
@@ -171,6 +207,7 @@ const Raporlama = () => {
           selected.value.toLowerCase() === customerName
         );
       });
+      console.log(`Filtered by customers: ${selectedCustomers.length} selected, ${filtered.length} records remaining.`);
     }
 
     if (selectedMachines.length > 0) {
@@ -180,6 +217,7 @@ const Raporlama = () => {
           selected.value.toLowerCase() === machineName
         );
       });
+      console.log(`Filtered by machines: ${selectedMachines.length} selected, ${filtered.length} records remaining.`);
     }
 
     if (selectedOperators.length > 0) {
@@ -189,12 +227,16 @@ const Raporlama = () => {
           selected.value.toLowerCase() === operatorName
         );
       });
+      console.log(`Filtered by operators: ${selectedOperators.length} selected, ${filtered.length} records remaining.`);
     }
 
+    console.log(`Total filtered records: ${filtered.length}`);
     return filtered;
   }, [workData, startDate, endDate, selectedCustomers, selectedMachines, selectedOperators]);
 
+  // Özet Veriyi Hesaplama
   const summaryData = useMemo(() => {
+    console.log('Generating summary data.');
     const summary = filteredData.reduce((acc, item) => {
       const key = `${item['Müşteri Adı']}-${item['Makine İsmi']}`;
       if (!acc[key]) {
@@ -206,24 +248,37 @@ const Raporlama = () => {
         };
       }
       const hours = calculateTotalWorkHours(item);
+      if (hours <= 0) {
+        console.warn(`Item ID: ${item.id} has non-positive work hours (${hours}). Skipping.`);
+        return acc;
+      }
       const machine = machineOptions.find(m => m.value === item['Makine İsmi']);
       const rate = machine ? Number(machine.hourlyRate) || 0 : 0;
       acc[key].hours += hours;
       acc[key].amount += hours * rate;
       return acc;
     }, {});
-    return Object.values(summary);
+    const summaryArray = Object.values(summary);
+    console.log('Generated summary data:', summaryArray);
+    return summaryArray;
   }, [filteredData, calculateTotalWorkHours, machineOptions]);
 
+  // Toplam Saat ve Tutar Hesaplama
   const totalHours = useMemo(() => {
-    return summaryData.reduce((total, item) => total + item.hours, 0);
+    const total = summaryData.reduce((total, item) => total + item.hours, 0);
+    console.log('Total hours:', total);
+    return total;
   }, [summaryData]);
 
   const totalAmount = useMemo(() => {
-    return summaryData.reduce((total, item) => total + item.amount, 0);
+    const total = summaryData.reduce((total, item) => total + item.amount, 0);
+    console.log('Total amount:', total);
+    return total;
   }, [summaryData]);
 
+  // Excel Raporu Oluşturma
   const generateExcelReport = useCallback(() => {
+    console.log('Generating Excel report.');
     const customerSummary = {};
     filteredData.forEach(item => {
       const customerName = item['Müşteri Adı'];
@@ -253,6 +308,8 @@ const Raporlama = () => {
       customerSummary[customerName].machines[machineType].amount += workHours * hourlyRate;
     });
 
+    console.log('Customer summary for Excel:', customerSummary);
+
     const summarySheet = Object.entries(customerSummary).map(([customer, data]) => ({
       'Müşteri': customer,
       'Toplam Çalışma Saati': Number(data.totalHours).toFixed(2),
@@ -280,6 +337,7 @@ const Raporlama = () => {
       '2. Vardiya': `${item['2. Başlangıç Saati'] || '-'} - ${item['2. Bitiş Saati'] || '-'}`,
     }));
 
+    console.log('Creating Excel sheets.');
     const wb = XLSX.utils.book_new();
 
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summarySheet), "Müşteri Özet");
@@ -289,11 +347,85 @@ const Raporlama = () => {
     const dateStr = startDate && endDate ?
       `_${startDate.toLocaleDateString('tr-TR')}_${endDate.toLocaleDateString('tr-TR')}`.replace(/\./g, '_') :
       '';
-    XLSX.writeFile(wb, `Puantaj_Raporu${dateStr}.xlsx`);
+    const fileName = `Puantaj_Raporu${dateStr}.xlsx`;
+    console.log(`Writing Excel file: ${fileName}`);
+    XLSX.writeFile(wb, fileName);
   }, [filteredData, machineOptions, calculateTotalWorkHours, startDate, endDate]);
 
-  if (loading) return <div className="loading">Yükleniyor...</div>;
-  if (error) return <div className="error">{error}</div>;
+  // Sıralama Fonksiyonu
+  const handleSort = useCallback((column) => {
+    const isAsc = orderBy === column && order === 'asc';
+    setOrder(isAsc ? 'desc' : 'asc');
+    setOrderBy(column);
+    console.log(`Sorting by ${column} in ${isAsc ? 'descending' : 'ascending'} order.`);
+  }, [orderBy, order]);
+
+  // Veriyi Sıralama
+  const sortedData = useMemo(() => {
+    console.log('Sorting data.');
+    const comparator = (a, b) => {
+      let aValue = a[orderBy];
+      let bValue = b[orderBy];
+
+      // Tarih sütunu özel işleniyor
+      if (orderBy === 'Tarih') {
+        aValue = parseDate(aValue);
+        bValue = parseDate(bValue);
+        if (aValue < bValue) return order === 'asc' ? -1 : 1;
+        if (aValue > bValue) return order === 'asc' ? 1 : -1;
+        return 0;
+      }
+
+      // Diğer sütunlar string karşılaştırması
+      if (typeof aValue === 'string') {
+        aValue = aValue.toLowerCase();
+      }
+      if (typeof bValue === 'string') {
+        bValue = bValue.toLowerCase();
+      }
+
+      if (aValue < bValue) return order === 'asc' ? -1 : 1;
+      if (aValue > bValue) return order === 'asc' ? 1 : -1;
+      return 0;
+    };
+
+    const sorted = [...filteredData].sort(comparator);
+    console.log('Sorted data:', sorted);
+    return sorted;
+  }, [filteredData, order, orderBy]);
+
+  // Filtre Değişikliklerini Yönetme
+  const handleCustomerChange = useCallback((selectedOptions) => {
+    setSelectedCustomers(selectedOptions || []);
+    console.log('Selected customers changed:', selectedOptions);
+  }, []);
+
+  const handleMachineChange = useCallback((selectedOptions) => {
+    setSelectedMachines(selectedOptions || []);
+    console.log('Selected machines changed:', selectedOptions);
+  }, []);
+
+  const handleOperatorChange = useCallback((selectedOptions) => {
+    setSelectedOperators(selectedOptions || []);
+    console.log('Selected operators changed:', selectedOptions);
+  }, []);
+
+  // Loading ve Error Durumları
+  if (loading) {
+    console.log('Raporlama component is loading.');
+    return <div className="loading">Yükleniyor...</div>;
+  }
+
+  if (error) {
+    console.error('Raporlama component encountered an error:', error);
+    return <div className="error">{error}</div>;
+  }
+
+  // Sıralama İkonları için Yardımcı Fonksiyon
+  const renderSortIcon = (column) => {
+    if (orderBy !== column) return null;
+    return order === 'asc' ? ' 🔼' : ' 🔽';
+  };
 
   return (
     <div className="raporlama-container">
@@ -340,7 +472,7 @@ const Raporlama = () => {
               isMulti
               options={customerOptions}
               value={selectedCustomers}
-              onChange={setSelectedCustomers}
+              onChange={handleCustomerChange}
               placeholder="Müşteri Seçin"
               className="react-select"
               classNamePrefix="select"
@@ -356,7 +488,7 @@ const Raporlama = () => {
               isMulti
               options={machineOptions}
               value={selectedMachines}
-              onChange={setSelectedMachines}
+              onChange={handleMachineChange}
               placeholder="Makine Seçin"
               className="react-select"
               classNamePrefix="select"
@@ -372,7 +504,7 @@ const Raporlama = () => {
               isMulti
               options={operatorOptions}
               value={selectedOperators}
-              onChange={setSelectedOperators}
+              onChange={handleOperatorChange}
               placeholder="Operatör Seçin"
               className="react-select"
               classNamePrefix="select"

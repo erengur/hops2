@@ -1,3 +1,4 @@
+// CustomerTable.js
 import React, { useState } from 'react';
 import {
   Table,
@@ -17,8 +18,30 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 
-const CustomerTable = ({ customers, onEdit, onEditSantiye, onDelete, type }) => {
+// Şantiyeleri cari kodlarına göre sıralayan yardımcı fonksiyon
+const sortSantiyeByCariCode = (santiyeler) => {
+  return [...santiyeler].sort((a, b) => {
+    const cariCodeA = a['Şantiye Cari Kodu'] || '';
+    const cariCodeB = b['Şantiye Cari Kodu'] || '';
+    
+    // Cari kodun son kısmını (sayısal değeri) al
+    const numberA = parseInt(cariCodeA.split('/').pop() || '0', 10);
+    const numberB = parseInt(cariCodeB.split('/').pop() || '0', 10);
+    
+    return numberA - numberB;
+  });
+};
+
+const CustomerTable = ({ 
+  customers, 
+  onEdit, 
+  onEditSantiye, 
+  onDelete,
+  onDeleteSantiye,
+  onTransferSantiye
+}) => {
   const [orderBy, setOrderBy] = useState('Müşteri Adı');
   const [order, setOrder] = useState('asc');
   const [openRows, setOpenRows] = useState({});
@@ -31,23 +54,48 @@ const CustomerTable = ({ customers, onEdit, onEditSantiye, onDelete, type }) => 
 
   const sortedCustomers = [...customers].sort((a, b) => {
     if (orderBy === 'cariCode') {
-      return order === 'asc' 
-        ? a.cariCode.localeCompare(b.cariCode, undefined, {numeric: true, sensitivity: 'base'})
-        : b.cariCode.localeCompare(a.cariCode, undefined, {numeric: true, sensitivity: 'base'});
+      return order === 'asc'
+        ? a.cariCode.localeCompare(b.cariCode, undefined, { numeric: true, sensitivity: 'base' })
+        : b.cariCode.localeCompare(a.cariCode, undefined, { numeric: true, sensitivity: 'base' });
     } else {
       return order === 'asc'
         ? a['Müşteri Adı'].localeCompare(b['Müşteri Adı'])
         : b['Müşteri Adı'].localeCompare(a['Müşteri Adı']);
     }
-  });
+  }).map(customer => ({
+    ...customer,
+    şantiyeler: customer.şantiyeler ? sortSantiyeByCariCode(customer.şantiyeler) : []
+  }));
 
   const toggleRow = (id) => {
     setOpenRows(prevState => ({ ...prevState, [id]: !prevState[id] }));
   };
 
+  const iconButtonStyles = {
+    borderRadius: '50%', 
+    padding: '6px',
+    width: '35px',
+    height: '35px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'background-color 0.2s ease',
+    '&:hover': {
+      backgroundColor: 'rgba(0,0,0,0.04)'
+    }
+};
+
+  const handleTransferClick = (santiye) => {
+    console.log('Transfer edilecek şantiye:', santiye);
+    onTransferSantiye(santiye);
+  };
+
   return (
-    <TableContainer component={Paper}>
-      <Table>
+    <TableContainer component={Paper} sx={{ overflowX: 'hidden' }}>
+      <Table
+        size="small"
+        sx={{ '& .MuiTableCell-root': { padding: '4px' }, tableLayout: 'auto', width: '100%' }}
+      >
         <TableHead>
           <TableRow>
             <TableCell padding="checkbox" />
@@ -71,7 +119,7 @@ const CustomerTable = ({ customers, onEdit, onEditSantiye, onDelete, type }) => 
             </TableCell>
             <TableCell>Telefon</TableCell>
             <TableCell>E-posta</TableCell>
-            <TableCell>İşlemler</TableCell>
+            <TableCell align="center">İşlemler</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -83,6 +131,9 @@ const CustomerTable = ({ customers, onEdit, onEditSantiye, onDelete, type }) => 
                     <IconButton
                       aria-label="expand row"
                       size="small"
+                      sx={iconButtonStyles}
+                      disableRipple
+                      disableFocusRipple
                       onClick={() => toggleRow(customer.id)}
                     >
                       {openRows[customer.id] ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
@@ -93,15 +144,34 @@ const CustomerTable = ({ customers, onEdit, onEditSantiye, onDelete, type }) => 
                 <TableCell>{customer.cariCode}</TableCell>
                 <TableCell>{customer.Telefon}</TableCell>
                 <TableCell>{customer['E-posta']}</TableCell>
-                <TableCell>
-                  <IconButton onClick={() => onEdit(customer)}>
-                    <EditIcon />
-                  </IconButton>
-                  {type === 'approved' && (
-                    <IconButton onClick={() => onDelete(customer)}>
+                <TableCell align="center">
+                  <Box display="inline-flex" gap="0px" sx={{ minWidth: '120px', justifyContent: 'center' }}>
+                    <IconButton
+                      sx={iconButtonStyles}
+                      disableRipple
+                      disableFocusRipple
+                      onClick={() => onEdit(customer)}
+                    >
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton
+                      sx={iconButtonStyles}
+                      disableRipple
+                      disableFocusRipple
+                      onClick={() => onDelete(customer)}
+                    >
                       <DeleteIcon />
                     </IconButton>
-                  )}
+                    <IconButton
+                      sx={iconButtonStyles}
+                      disableRipple
+                      disableFocusRipple
+                      onClick={() => handleTransferClick(customer)}
+                      title="Veri Aktarma"
+                    >
+                      <ArrowForwardIcon />
+                    </IconButton>
+                  </Box>
                 </TableCell>
               </TableRow>
               {customer.şantiyeler && customer.şantiyeler.length > 0 && (
@@ -112,14 +182,14 @@ const CustomerTable = ({ customers, onEdit, onEditSantiye, onDelete, type }) => 
                         <Typography variant="h6" gutterBottom component="div">
                           Şantiyeler
                         </Typography>
-                        <Table size="small" aria-label="şantiyeler">
+                        <Table size="small" sx={{ '& .MuiTableCell-root': { padding: '4px' }, width: '100%' }}>
                           <TableHead>
                             <TableRow>
                               <TableCell>Şantiye Adı</TableCell>
                               <TableCell>Cari Kodu</TableCell>
                               <TableCell>Telefon</TableCell>
                               <TableCell>E-posta</TableCell>
-                              <TableCell>İşlemler</TableCell>
+                              <TableCell align="center">İşlemler</TableCell>
                             </TableRow>
                           </TableHead>
                           <TableBody>
@@ -131,13 +201,34 @@ const CustomerTable = ({ customers, onEdit, onEditSantiye, onDelete, type }) => 
                                 <TableCell>{şantiye.cariCode}</TableCell>
                                 <TableCell>{şantiye.Telefon}</TableCell>
                                 <TableCell>{şantiye['E-posta']}</TableCell>
-                                <TableCell>
-                                  <IconButton onClick={() => onEditSantiye(şantiye)}>
-                                    <EditIcon />
-                                  </IconButton>
-                                  <IconButton onClick={() => onDelete(şantiye)}>
-                                    <DeleteIcon />
-                                  </IconButton>
+                                <TableCell align="center">
+                                <Box display="inline-flex" gap="0px" sx={{ minWidth: '120px', justifyContent: 'center' }}>
+                                    <IconButton
+                                      sx={iconButtonStyles}
+                                      disableRipple
+                                      disableFocusRipple
+                                      onClick={() => onEditSantiye(şantiye)}
+                                    >
+                                      <EditIcon />
+                                    </IconButton>
+                                    <IconButton
+                                      sx={iconButtonStyles}
+                                      disableRipple
+                                      disableFocusRipple
+                                      onClick={() => onDeleteSantiye(şantiye)}
+                                    >
+                                      <DeleteIcon />
+                                    </IconButton>
+                                    <IconButton
+                                      sx={iconButtonStyles}
+                                      disableRipple
+                                      disableFocusRipple
+                                      onClick={() => handleTransferClick(şantiye)}
+                                      title="Veri Aktarma"
+                                    >
+                                      <ArrowForwardIcon />
+                                    </IconButton>
+                                  </Box>
                                 </TableCell>
                               </TableRow>
                             ))}

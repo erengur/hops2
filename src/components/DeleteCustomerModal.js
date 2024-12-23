@@ -1,26 +1,39 @@
 // src/components/DeleteCustomerModal.js
 
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Modal,
   Typography,
   Box,
   Button,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import { getFirestore, doc, deleteDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import {
+  getFirestore,
+  doc,
+  deleteDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  writeBatch,
+} from 'firebase/firestore';
+import CustomerSelectionTable from './CustomerSelectionTable';
+import { handleDataTransfer } from './TransferCustomerModal';
 
 const ModalBox = styled(Box)(({ theme }) => ({
   position: 'absolute',
   top: '50%',
   left: '50%',
   transform: 'translate(-50%, -50%)',
-  width: 500,
+  width: 600,
   backgroundColor: '#ffffff',
   color: '#000000',
   boxShadow: theme.shadows[5],
   padding: theme.spacing(4),
-  maxHeight: '80vh',
+  maxHeight: '90vh',
   overflowY: 'auto',
   border: '1px solid #ccc',
 }));
@@ -33,37 +46,91 @@ const DeleteCustomerModal = ({
   setError,
   setSuccessMessage,
   setSelectedCustomer,
+  onTransfer
 }) => {
-  const handleDeleteCustomer = async () => {
-    if (!selectedCustomer) return;
+  const [showTransferOption, setShowTransferOption] = useState(false);
+  const [selectedTargetCustomer, setSelectedTargetCustomer] = useState(null);
+  const [availableCustomers, setAvailableCustomers] = useState([]);
 
+  // Diğer müşterileri getir
+  const fetchAvailableCustomers = useCallback(async () => {
     const db = getFirestore();
     try {
-      // If it's a main company, check for linked şantiyeler
-      if (selectedCustomer.parentId === null) {
-        // Check if any shantiyes are linked
-        const shantiyelerQuery = query(
+      const customerQuery = query(
+        collection(db, 'müşteri listesi'),
+        where('Onay', '==', 'Onaylandı'),
+        where('__name__', '!=', selectedCustomer.id)
+      );
+      const snapshot = await getDocs(customerQuery);
+      const customers = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setAvailableCustomers(customers);
+    } catch (error) {
+      console.error('Müşteriler getirilirken hata oluştu:', error);
+      setError('Müşteriler getirilirken hata oluştu.');
+      setAlertOpen(true);
+    }
+  }, [selectedCustomer, setError, setAlertOpen]);
+
+  const handleTransferAndDelete = async () => {
+    try {
+      // Önce verileri transfer et
+      await handleDataTransfer({
+        sourceCustomer: selectedCustomer,
+        targetCustomer: selectedTargetCustomer,
+        isSantiyeTransfer: false,
+        setError,
+        setSuccessMessage,
+        setAlertOpen,
+      });
+
+      const db = getFirestore();
+
+      // Eğer ana müşteriyse, şantiyelerini de güncelle
+      if (!selectedCustomer.parentId) {
+        const batch = writeBatch(db);
+        const santiyeQuery = query(
           collection(db, 'müşteri listesi'),
           where('parentId', '==', selectedCustomer.id)
         );
-        const shantiyelerSnapshot = await getDocs(shantiyelerQuery);
-        if (!shantiyelerSnapshot.empty) {
-          setError('Bu ana şirketin bağlı şantiyeleri var. Önce şantiyeleri silmelisiniz.');
-          setAlertOpen(true);
-          onClose();
-          return;
-        }
+        const santiyeSnapshot = await getDocs(santiyeQuery);
+
+        santiyeSnapshot.forEach((santiyeDoc) => {
+          batch.update(santiyeDoc.ref, {
+            parentId: selectedTargetCustomer.id,
+          });
+        });
+
+        await batch.commit();
       }
 
+      // Müşteriyi sil
       await deleteDoc(doc(db, 'müşteri listesi', selectedCustomer.id));
 
-      // Update Puantajlar Related to the Deleted Customer
+      setSuccessMessage('Müşteri silindi ve veriler başarıyla aktarıldı.');
+      setAlertOpen(true);
+      onClose();
+      setSelectedCustomer(null);
+    } catch (error) {
+      console.error('İşlem sırasında bir hata oluştu:', error);
+      setError('İşlem sırasında bir hata oluştu.');
+      setAlertOpen(true);
+    }
+  };
+
+  const handleDeleteOnly = async () => {
+    const db = getFirestore();
+    try {
+      await deleteDoc(doc(db, 'müşteri listesi', selectedCustomer.id));
+
       const puantajlarRef = collection(db, 'puantajlar');
-      const q = query(
+      const puantajQuery = query(
         puantajlarRef,
-        where('Cari Kodu', '==', selectedCustomer.cariCode || '')
+        where('Müşteri Adı', '==', selectedCustomer['Müşteri Adı'])
       );
-      const puantajlarSnapshot = await getDocs(q);
+      const puantajlarSnapshot = await getDocs(puantajQuery);
 
       const batch = writeBatch(db);
       puantajlarSnapshot.forEach((puantajDoc) => {
@@ -103,27 +170,35 @@ const DeleteCustomerModal = ({
               <strong>E-posta:</strong> {selectedCustomer['E-posta']}
             </Typography>
             <Typography>
-              <strong>Cari Kodu:</strong> {selectedCustomer['cariCode']}
+              <strong>Cari Kodu:</strong> {selectedCustomer.cariCode}
             </Typography>
           </Box>
         )}
+
         <Typography color="error" mb={2}>
-          Bu müşteriyi silerseniz, ilgili puantaj verileri de kaybolacaktır. Devam etmek istediğinize emin misiniz?
+          Bu müşteriyi sildiğinizde, ilgili puantaj verileri kaybolacaktır.
         </Typography>
-        <Box mt={2} display="flex" justifyContent="flex-end">
-          <Button
-            variant="contained"
-            color="secondary"
-            onClick={handleDeleteCustomer}
-            style={{ marginRight: '10px' }}
-          >
-            Sil
+
+        <Box mt={2} display="flex" justifyContent="flex-end" gap={2}>
+          <Button variant="outlined" onClick={onClose}>
+            İptal
           </Button>
           <Button
             variant="contained"
-            onClick={onClose}
+            color="primary"
+            onClick={() => {
+              onClose();
+              onTransfer(selectedCustomer);
+            }}
           >
-            İptal
+            Verileri Taşı
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleDeleteOnly}
+          >
+            Sil
           </Button>
         </Box>
       </ModalBox>

@@ -110,7 +110,20 @@ const EditSantiyeModal = ({
         const conflictingDoc = !nameConflictSnapshot.empty
           ? nameConflictSnapshot.docs[0]
           : cariCodeConflictSnapshot.docs[0];
-        setConflictingSantiye({ ...conflictingDoc.data(), id: conflictingDoc.id });
+
+        // Çakışan şantiyenin puantaj verilerini kontrol et
+        const puantajlarRef = collection(db, 'puantajlar');
+        const puantajQuery = query(
+          puantajlarRef,
+          where('Müşteri Adı', '==', conflictingDoc.data()['Şantiye Adı'])
+        );
+        const puantajSnapshot = await getDocs(puantajQuery);
+
+        setConflictingSantiye({
+          ...conflictingDoc.data(),
+          id: conflictingDoc.id,
+          puantajCount: puantajSnapshot.size // Puantaj sayısını ekle
+        });
         setIsConflictModalOpen(true);
         return;
       }
@@ -126,32 +139,39 @@ const EditSantiyeModal = ({
   const proceedWithUpdate = () => {
     const changes = [];
 
-    if (normalizeString(editSantiyeName) !== normalizeString(selectedSantiye['Şantiye Adı'])) {
+    // Güvenli trim işlemi için yardımcı fonksiyon
+    const safeTrim = (value) => value ? value.trim() : '';
+    const safeCompare = (val1, val2) => safeTrim(val1) !== safeTrim(val2);
+
+    if (safeCompare(editSantiyeName, selectedSantiye['Şantiye Adı'])) {
       changes.push({
         field: 'Şantiye Adı',
         old: selectedSantiye['Şantiye Adı'] || '',
-        new: normalizeString(editSantiyeName),
+        new: safeTrim(editSantiyeName),
       });
     }
-    if (normalizeString(editSantiyePhone) !== normalizeString(selectedSantiye['Telefon'])) {
+
+    if (safeCompare(editSantiyePhone, selectedSantiye['Telefon'])) {
       changes.push({
         field: 'Telefon',
         old: selectedSantiye['Telefon'] || '',
-        new: normalizeString(editSantiyePhone),
+        new: safeTrim(editSantiyePhone),
       });
     }
-    if (normalizeString(editSantiyeEmail) !== normalizeString(selectedSantiye['E-posta'])) {
+
+    if (safeCompare(editSantiyeEmail, selectedSantiye['E-posta'])) {
       changes.push({
         field: 'E-posta',
         old: selectedSantiye['E-posta'] || '',
-        new: normalizeString(editSantiyeEmail),
+        new: safeTrim(editSantiyeEmail),
       });
     }
-    if (normalizeString(editSantiyeCariCode) !== normalizeString(selectedSantiye['Şantiye Cari Kodu'])) {
+
+    if (safeCompare(editSantiyeCariCode, selectedSantiye['Şantiye Cari Kodu'])) {
       changes.push({
         field: 'Şantiye Cari Kodu',
         old: selectedSantiye['Şantiye Cari Kodu'] || '',
-        new: normalizeString(editSantiyeCariCode),
+        new: safeTrim(editSantiyeCariCode),
       });
     }
 
@@ -161,24 +181,26 @@ const EditSantiyeModal = ({
 
   const confirmUpdate = async () => {
     setIsConfirmUpdateOpen(false);
-  
     const db = getFirestore();
     const batch = writeBatch(db);
-  
+
     try {
       const oldSantiyeName = normalizeString(selectedSantiye['Şantiye Adı']);
-      const oldCariCode = normalizeString(selectedSantiye['Şantiye Cari Kodu']);
-  
+
       // Şantiye adını ve cari kodunu güncelle
       const santiyeRef = doc(db, 'müşteri listesi', selectedSantiye.id);
-      batch.update(santiyeRef, {
+      const updateData = {
         'Şantiye Adı': normalizeString(editSantiyeName),
         'Müşteri Adı': normalizeString(editSantiyeName),
         Telefon: normalizeString(editSantiyePhone),
         'E-posta': normalizeString(editSantiyeEmail),
         'Şantiye Cari Kodu': normalizeString(editSantiyeCariCode),
-      });
-  
+        cariCode: normalizeString(editSantiyeCariCode),
+        updatedAt: new Date().toISOString()
+      };
+
+      batch.update(santiyeRef, updateData);
+
       // İlgili Puantajları Güncelle
       const puantajlarRef = collection(db, 'puantajlar');
       const puantajQuery = query(
@@ -186,43 +208,89 @@ const EditSantiyeModal = ({
         where('Müşteri Adı', '==', oldSantiyeName)
       );
       const puantajlarSnapshot = await getDocs(puantajQuery);
-  
+
       if (!puantajlarSnapshot.empty) {
         puantajlarSnapshot.forEach((puantajDoc) => {
           batch.update(puantajDoc.ref, {
             'Müşteri Adı': normalizeString(editSantiyeName),
-            'Cari Kodu': normalizeString(editSantiyeCariCode), // Cari kodunu da güncelliyoruz
+            'Cari Kodu': normalizeString(editSantiyeCariCode),
           });
         });
-      } else {
-        console.log('Güncelleme yapılacak puantaj bulunamadı.');
       }
-  
+
       await batch.commit();
-      console.log('Şantiye ve puantajlar başarıyla güncellendi.');
+      
+      setSuccessMessage('Şantiye başarıyla güncellendi.');
+      setAlertOpen(true);
+      onClose();
     } catch (error) {
       console.error('Güncelleme sırasında bir hata oluştu:', error);
+      setError('Güncelleme sırasında bir hata oluştu.');
+      setAlertOpen(true);
     }
   };
   
 
-  const handleConflictResolution = async () => {
+  const handleConflictResolution = async (finalData) => {
     setIsConflictModalOpen(false);
     const db = getFirestore();
+    const batch = writeBatch(db);
 
     try {
       if (!conflictingSantiye || !conflictingSantiye.id) {
         throw new Error('Çakışan şantiye bilgisi eksik veya geçersiz.');
       }
 
-      await deleteDoc(doc(db, 'müşteri listesi', conflictingSantiye.id));
-      await confirmUpdate();
+      // Her iki şantiyenin puantajlarını al
+      const puantajlarRef = collection(db, 'puantajlar');
+      
+      // 1. Şantiyenin puantajları
+      const puantajQuery1 = query(
+        puantajlarRef,
+        where('Müşteri Adı', '==', selectedSantiye['Şantiye Adı'])
+      );
+      
+      // 2. Şantiyenin puantajları
+      const puantajQuery2 = query(
+        puantajlarRef,
+        where('Müşteri Adı', '==', conflictingSantiye['Şantiye Adı'])
+      );
 
-      setSuccessMessage('Çakışma çözüldü ve şantiye güncellendi.');
+      const [puantajlarSnapshot1, puantajlarSnapshot2] = await Promise.all([
+        getDocs(puantajQuery1),
+        getDocs(puantajQuery2)
+      ]);
+
+      // Tüm puantajları yeni şantiye bilgileriyle güncelle
+      [...puantajlarSnapshot1.docs, ...puantajlarSnapshot2.docs].forEach((puantajDoc) => {
+        batch.update(puantajDoc.ref, {
+          'Müşteri Adı': finalData.finalName,
+          'Cari Kodu': finalData.finalCariCode,
+        });
+      });
+
+      // Birleştirilmiş şantiyeyi güncelle
+      const santiyeRef = doc(db, 'müşteri listesi', selectedSantiye.id);
+      batch.update(santiyeRef, {
+        'Şantiye Adı': finalData.finalName,
+        'Müşteri Adı': finalData.finalName,
+        'Şantiye Cari Kodu': finalData.finalCariCode,
+        cariCode: finalData.finalCariCode,
+        updatedAt: new Date().toISOString()
+      });
+
+      // Çakışan şantiyeyi sil
+      await deleteDoc(doc(db, 'müşteri listesi', conflictingSantiye.id));
+
+      // Batch işlemini uygula
+      await batch.commit();
+
+      setSuccessMessage('Şantiyeler başarıyla birleştirildi ve tüm veriler aktarıldı.');
       setAlertOpen(true);
+      onClose();
     } catch (error) {
-      console.error('Çakışma çözümlenirken hata oluştu:', error);
-      setError(`Çakışma çözümlenirken hata oluştu: ${error.message}`);
+      console.error('Şantiye birleştirme sırasında hata oluştu:', error);
+      setError(`Şantiye birleştirme sırasında bir hata oluştu: ${error.message}`);
       setAlertOpen(true);
     }
   };
@@ -245,7 +313,7 @@ const EditSantiyeModal = ({
       <Modal open={isOpen} onClose={onClose}>
         <ModalBox>
           <Typography variant="h6" gutterBottom>
-            Şantiye Düzenle
+            ��antiye Düzenle
           </Typography>
           <Box display="flex" alignItems="center">
             <TextField
@@ -310,6 +378,14 @@ const EditSantiyeModal = ({
           'Şantiye Adı': editSantiyeName,
           'Şantiye Cari Kodu': editSantiyeCariCode,
         }}
+        oldCustomerData={{
+          'Şantiye Adı': selectedSantiye?.['Şantiye Adı'] || '',
+          'Şantiye Cari Kodu': selectedSantiye?.['Şantiye Cari Kodu'] || '',
+        }}
+        message={`Bu isimde veya cari kodda bir şantiye zaten var. 
+          Çakışan şantiyeye ait ${conflictingSantiye?.puantajCount || 0} adet puantaj verisi bulunmaktadır. 
+          Bu verileri yeni şantiyeye aktarmak ister misiniz?`}
+        type="santiye"
       />
 
       <ConfirmUpdateModal

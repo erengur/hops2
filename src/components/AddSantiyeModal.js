@@ -17,7 +17,9 @@ import {
   query,
   where,
   doc,
-  deleteDoc,
+  getDoc,
+  updateDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import CustomerSelectionTable from './CustomerSelectionTable';
 import ConflictResolutionModal from './ConflictResolutionModal';
@@ -59,7 +61,7 @@ const AddSantiyeModal = ({
   const [santiyeEmail, setSantiyeEmail] = useState('');
   const [santiyeCariCode, setSantiyeCariCode] = useState('');
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
-  const [conflictingCustomer, setConflictingCustomer] = useState(null);
+  const [conflictingSantiye, setConflictingSantiye] = useState(null);
   const [isCustomerSelectionOpen, setIsCustomerSelectionOpen] = useState(false);
   const [pendingCustomers, setPendingCustomers] = useState([]);
 
@@ -74,15 +76,39 @@ const AddSantiyeModal = ({
     }
 
     try {
+      // Mevcut şantiyeleri getir ve cari kodlarını analiz et
       const shantiyeListRef = collection(db, 'müşteri listesi');
       const shantiyeQuery = query(
         shantiyeListRef,
         where('parentId', '==', selectedCustomer.id)
       );
       const shantiyeSnapshot = await getDocs(shantiyeQuery);
+      
+      // Mevcut şantiye numaralarını topla
+      const existingNumbers = shantiyeSnapshot.docs
+        .map(doc => {
+          const cariCode = doc.data()['Şantiye Cari Kodu'] || '';
+          const number = cariCode.split('/').pop();
+          return number ? parseInt(number, 10) : 0;
+        })
+        .filter(num => !isNaN(num));
 
-      const nextShantiyeNumber = shantiyeSnapshot.size + 1;
-      const generatedCode = `${mainFirmCariCode}/${nextShantiyeNumber}`;
+      // Boşluk kontrolü yap
+      let nextNumber = 1;
+      existingNumbers.sort((a, b) => a - b); // Sırala
+
+      // Sıralı numaralarda ilk boşluğu bul
+      for (let i = 0; i < existingNumbers.length; i++) {
+        if (existingNumbers[i] !== i + 1) {
+          nextNumber = i + 1;
+          break;
+        }
+        nextNumber = i + 2;
+      }
+
+      const generatedCode = `${mainFirmCariCode}/${nextNumber}`;
+      console.log('Mevcut şantiye numaraları:', existingNumbers);
+      console.log('Yeni şantiye kodu:', generatedCode);
 
       setSantiyeCariCode(generatedCode);
     } catch (error) {
@@ -105,66 +131,44 @@ const AddSantiyeModal = ({
       return;
     }
 
-    const db = getFirestore();
+    if (!santiyeCariCode.trim()) {
+      setError('Cari kod gereklidir.');
+      setAlertOpen(true);
+      return;
+    }
 
+    await checkConflictsAndAdd();
+  };
+
+  const checkConflictsAndAdd = async () => {
+    const db = getFirestore();
     try {
-      const shantiyeListRef = collection(db, 'müşteri listesi');
-      
-      // Müşteri adı çakışması kontrolü
+      // Şantiye adı çakışmasını kontrol et
+      const santiyeListRef = collection(db, 'müşteri listesi');
       const nameConflictQuery = query(
-        shantiyeListRef,
-        where('Müşteri Adı', '==', santiyeName.trim())
+        santiyeListRef,
+        where('Şantiye Adı', '==', santiyeName.trim()),
+        where('__name__', '!=', selectedCustomer?.id || '')
       );
+
       const nameConflictSnapshot = await getDocs(nameConflictQuery);
 
       if (!nameConflictSnapshot.empty) {
-        const conflictingDoc = nameConflictSnapshot.docs[0];
-        setConflictingCustomer({ ...conflictingDoc.data(), id: conflictingDoc.id });
-        setIsConflictModalOpen(true);
-        return;
-      }
+        const conflictingSantiye = {
+          ...nameConflictSnapshot.docs[0].data(),
+          id: nameConflictSnapshot.docs[0].id
+        };
 
-      // Cari kod çakışması kontrolü
-      const cariCodeConflictQuery = query(
-        shantiyeListRef,
-        where('cariCode', '==', santiyeCariCode.trim())
-      );
-      const cariCodeConflictSnapshot = await getDocs(cariCodeConflictQuery);
-
-      if (!cariCodeConflictSnapshot.empty) {
-        const conflictingDoc = cariCodeConflictSnapshot.docs[0];
-        setConflictingCustomer({ ...conflictingDoc.data(), id: conflictingDoc.id });
+        // Veri aktarma modalını göster
+        setConflictingSantiye(conflictingSantiye);
         setIsConflictModalOpen(true);
         return;
       }
 
       await addSantiyeToFirestore();
     } catch (error) {
-      console.error('Şantiye eklenirken bir hata oluştu:', error);
-      setError('Şantiye eklenirken bir hata oluştu.');
-      setAlertOpen(true);
-    }
-  };
-
-  const handleConflictResolution = async () => {
-    setIsConflictModalOpen(false);
-    const db = getFirestore();
-
-    try {
-      if (!conflictingCustomer || !conflictingCustomer.id) {
-        throw new Error('Çakışan şantiye bilgisi eksik veya geçersiz.');
-      }
-
-      await deleteDoc(doc(db, 'müşteri listesi', conflictingCustomer.id));
-      console.log(`Çakışan şantiye silindi: ${conflictingCustomer['Müşteri Adı']}`);
-
-      await addSantiyeToFirestore();
-
-      setSuccessMessage('Çakışma çözüldü ve yeni şantiye eklendi.');
-      setAlertOpen(true);
-    } catch (error) {
-      console.error('Çakışma çözümlenirken hata oluştu:', error);
-      setError(`Çakışma çözümlenirken hata oluştu: ${error.message}`);
+      console.error('Çakışma kontrolü sırasında hata:', error);
+      setError(`Çakışma kontrolü sırasında bir hata oluştu: ${error.message}`);
       setAlertOpen(true);
     }
   };
@@ -172,7 +176,31 @@ const AddSantiyeModal = ({
   const addSantiyeToFirestore = async () => {
     const db = getFirestore();
     try {
-      const docRef = await addDoc(collection(db, 'müşteri listesi'), {
+      // Cari kodun doğru s��rada olduğunu kontrol et
+      const currentNumber = parseInt(santiyeCariCode.split('/').pop(), 10);
+      const shantiyeQuery = query(
+        collection(db, 'müşteri listesi'),
+        where('parentId', '==', selectedCustomer.id)
+      );
+      const shantiyeSnapshot = await getDocs(shantiyeQuery);
+      
+      const existingNumbers = shantiyeSnapshot.docs
+        .map(doc => {
+          const cariCode = doc.data()['Şantiye Cari Kodu'] || '';
+          const number = cariCode.split('/').pop();
+          return number ? parseInt(number, 10) : 0;
+        })
+        .filter(num => !isNaN(num));
+
+      // Eğer bu numara zaten kullanıldıysa, yeni bir kod generate et
+      if (existingNumbers.includes(currentNumber)) {
+        await generateCariCode(); // Yeni kod generate et
+        setError('Şantiye kodu çakışması tespit edildi. Yeni kod oluşturuldu.');
+        setAlertOpen(true);
+        return;
+      }
+
+      const santiyeData = {
         'Müşteri Adı': santiyeName.trim(),
         Telefon: santiyePhone.trim(),
         'E-posta': santiyeEmail.trim(),
@@ -182,21 +210,39 @@ const AddSantiyeModal = ({
         Onay: 'Onaylandı',
         'Şantiye Adı': santiyeName.trim(),
         'Şantiye Cari Kodu': santiyeCariCode.trim(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      // Eğer seçilen müşteri onay bekleyen listesinden geldiyse, o kaydı güncelleyelim
+      const selectedPendingCustomer = pendingCustomers.find(
+        customer => customer['Müşteri Adı'] === santiyeName.trim()
+      );
+
+      let docRef;
+      if (selectedPendingCustomer) {
+        // Var olan müşteriyi güncelle
+        docRef = doc(db, 'müşteri listesi', selectedPendingCustomer.id);
+        await updateDoc(docRef, santiyeData);
+      } else {
+        // Yeni şantiye ekle
+        docRef = await addDoc(collection(db, 'müşteri listesi'), santiyeData);
+      }
+
+      // Ana müşterinin şantiye sayısını güncelle
+      const parentRef = doc(db, 'müşteri listesi', selectedCustomer.id);
+      const parentDoc = await getDoc(parentRef);
+      const currentCount = parentDoc.data()?.santiyeCount || 0;
+      await updateDoc(parentRef, {
+        santiyeCount: currentCount + 1,
+        updatedAt: new Date().toISOString()
       });
 
       setCustomerShantiyeler([
         ...customerShantiyeler,
         {
-          id: docRef.id,
-          'Müşteri Adı': santiyeName.trim(),
-          Telefon: santiyePhone.trim(),
-          'E-posta': santiyeEmail.trim(),
-          cariCode: santiyeCariCode.trim(),
-          Şantiye: true,
-          parentId: selectedCustomer.id,
-          Onay: 'Onaylandı',
-          'Şantiye Adı': santiyeName.trim(),
-          'Şantiye Cari Kodu': santiyeCariCode.trim(),
+          id: selectedPendingCustomer ? selectedPendingCustomer.id : docRef.id,
+          ...santiyeData
         },
       ]);
 
@@ -245,6 +291,63 @@ const AddSantiyeModal = ({
       setAlertOpen(true);
     }
   }, [setError, setAlertOpen]);
+
+  const handleConflictResolution = async () => {
+    setIsConflictModalOpen(false);
+    const db = getFirestore();
+    const batch = writeBatch(db);
+
+    try {
+      if (!conflictingSantiye || !conflictingSantiye.id) {
+        throw new Error('Çakışan şantiye bilgisi eksik veya geçersiz.');
+      }
+
+      // Her iki şantiyenin puantajlarını al
+      const puantajlarRef = collection(db, 'puantajlar');
+      const puantajQuery = query(
+        puantajlarRef,
+        where('Müşteri Adı', '==', conflictingSantiye['Şantiye Adı'])
+      );
+      const puantajlarSnapshot = await getDocs(puantajQuery);
+
+      // Yeni şantiye verilerini hazırla
+      const newSantiyeData = {
+        'Müşteri Adı': santiyeName.trim(),
+        'Şantiye Adı': santiyeName.trim(),
+        Telefon: santiyePhone.trim(),
+        'E-posta': santiyeEmail.trim(),
+        cariCode: santiyeCariCode.trim(),
+        'Şantiye Cari Kodu': santiyeCariCode.trim(),
+        Şantiye: true,
+        parentId: selectedCustomer.id,
+        Onay: 'Onaylandı',
+        updatedAt: new Date().toISOString()
+      };
+
+      // Çakışan şantiyeyi güncelle
+      const conflictingSantiyeRef = doc(db, 'müşteri listesi', conflictingSantiye.id);
+      batch.update(conflictingSantiyeRef, newSantiyeData);
+
+      // Tüm puantajları güncelle
+      puantajlarSnapshot.forEach((puantajDoc) => {
+        batch.update(puantajDoc.ref, {
+          'Müşteri Adı': santiyeName.trim(),
+          'Cari Kodu': santiyeCariCode.trim(),
+        });
+      });
+
+      await batch.commit();
+
+      setSuccessMessage('Şantiyeler başarıyla birleştirildi ve tüm veriler aktarıldı.');
+      setAlertOpen(true);
+      onClose();
+      resetForm();
+    } catch (error) {
+      console.error('Şantiye birleştirme sırasında hata oluştu:', error);
+      setError(`Şantiye birleştirme sırasında bir hata oluştu: ${error.message}`);
+      setAlertOpen(true);
+    }
+  };
 
   return (
     <>
@@ -317,14 +420,16 @@ const AddSantiyeModal = ({
         isOpen={isConflictModalOpen}
         onClose={() => setIsConflictModalOpen(false)}
         onConfirm={handleConflictResolution}
-        conflictingCustomer={conflictingCustomer}
+        conflictingCustomer={conflictingSantiye}
         newCustomerData={{
           'Şantiye Adı': santiyeName,
-          cariCode: santiyeCariCode,
+          'Şantiye Cari Kodu': santiyeCariCode,
         }}
+        message="Bu isimde bir şantiye zaten var. Mevcut şantiyeyi güncellemek ve verileri aktarmak ister misiniz?"
       />
     </>
   );
 };
 
 export default AddSantiyeModal;
+

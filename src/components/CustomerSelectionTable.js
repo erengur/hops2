@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Table,
   TableBody,
@@ -9,149 +9,204 @@ import {
   Paper,
   TableSortLabel,
   TextField,
+  Box,
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import PropTypes from 'prop-types';
 
-const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
-  marginTop: theme.spacing(2),
-  maxHeight: 400,
-  overflowY: 'auto',
-}));
+const StyledTableContainer = styled(TableContainer)({
+  maxHeight: '400px',
+  '& .MuiTableCell-root': {
+    padding: '8px 16px',
+  }
+});
 
-const StyledTableCell = styled(TableCell)(({ theme }) => ({
-  fontSize: '0.875rem',
-}));
+const StyledTableCell = styled(TableCell)({
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  maxWidth: '200px',
+});
 
-const FilterContainer = styled(Paper)(({ theme }) => ({
-  padding: theme.spacing(2),
-  marginBottom: theme.spacing(2),
-}));
+const FilterBox = styled(Box)({
+  padding: '16px',
+  backgroundColor: '#fff',
+});
 
-const CustomerSelectionTable = ({ customers = [], onSelectCustomer, includeSpecialCases = false }) => {
-  const [sortedCustomers, setSortedCustomers] = useState([]);
+const CustomerSelectionTable = ({ customers = [], onSelectCustomer }) => {
   const [orderBy, setOrderBy] = useState('Müşteri Adı');
   const [order, setOrder] = useState('asc');
   const [filter, setFilter] = useState('');
+  const [selectedId, setSelectedId] = useState(null);
 
-  useEffect(() => {
-    const filteredCustomers = includeSpecialCases
-      ? customers
-      : customers.filter(customer => !customer.Şantiye);
-    setSortedCustomers(filteredCustomers);
-  }, [customers, includeSpecialCases]);
+  // Müşterileri ve şantiyeleri grupla
+  const groupedCustomers = customers.reduce((acc, customer) => {
+    if (!customer.parentId) {
+      if (!acc[customer.id]) {
+        acc[customer.id] = {
+          parent: customer,
+          children: []
+        };
+      } else {
+        acc[customer.id].parent = customer;
+      }
+    } else {
+      if (!acc[customer.parentId]) {
+        acc[customer.parentId] = {
+          parent: null,
+          children: [customer]
+        };
+      } else {
+        acc[customer.parentId].children.push(customer);
+      }
+    }
+    return acc;
+  }, {});
 
+  // Sıralama fonksiyonu
   const handleSort = (property) => {
     const isAsc = orderBy === property && order === 'asc';
-    const newOrder = isAsc ? 'desc' : 'asc';
-    setOrder(newOrder);
+    setOrder(isAsc ? 'desc' : 'asc');
     setOrderBy(property);
+  };
 
-    const sorted = [...sortedCustomers].sort((a, b) => {
-      if (a[property] === undefined || b[property] === undefined) return 0;
-
-      if (typeof a[property] === 'string') {
-        return a[property].localeCompare(b[property]) * (newOrder === 'asc' ? 1 : -1);
-      }
-
-      return (a[property] < b[property] ? -1 : 1) * (newOrder === 'asc' ? 1 : -1);
+  // Düzenlenmiş ve filtrelenmiş listeyi oluştur
+  const sortedCustomers = [];
+  
+  // Önce ana müşterileri sırala
+  const parentCustomers = Object.values(groupedCustomers)
+    .map(({ parent }) => parent)
+    .filter(Boolean) // null değerleri filtrele
+    .sort((a, b) => {
+      const comparison = (a[orderBy] || '').localeCompare(b[orderBy] || '');
+      return order === 'asc' ? comparison : -comparison;
     });
 
-    setSortedCustomers(sorted);
-  };
+  // Sıralanmış ana müşterilere göre listeyi oluştur
+  parentCustomers.forEach(parent => {
+    const children = groupedCustomers[parent.id]?.children || [];
+    
+    const parentMatchesFilter = 
+      parent['Müşteri Adı']?.toLowerCase().includes(filter.toLowerCase()) ||
+      parent.cariCode?.toLowerCase().includes(filter.toLowerCase());
 
-  const handleFilterChange = (e) => {
-    setFilter(e.target.value);
-  };
+    const filteredChildren = children.filter(child => 
+      filter === '' || 
+      child['Müşteri Adı']?.toLowerCase().includes(filter.toLowerCase()) ||
+      child.cariCode?.toLowerCase().includes(filter.toLowerCase())
+    );
 
-  const filteredCustomers = sortedCustomers.filter(
-    (customer) =>
-      customer['Müşteri Adı']?.toLowerCase().includes(filter.toLowerCase()) ||
-      customer.cariCode?.toLowerCase().includes(filter.toLowerCase())
-  );
+    if (parentMatchesFilter || filteredChildren.length > 0) {
+      // Ana müşteriyi ekle
+      sortedCustomers.push({
+        ...parent,
+        isParent: true
+      });
+
+      // Şantiyeleri alfabetik sırala ve ekle
+      filteredChildren
+        .sort((a, b) => (a['Müşteri Adı'] || '').localeCompare(b['Müşteri Adı'] || ''))
+        .forEach(child => {
+          sortedCustomers.push({
+            ...child,
+            isChild: true
+          });
+        });
+    }
+  });
 
   return (
-    <StyledTableContainer component={Paper}>
-      <FilterContainer>
+    <>
+      <FilterBox>
         <TextField
           fullWidth
+          size="small"
           variant="outlined"
-          placeholder="Müşteri adı veya cari kod ile filtrele"
+          placeholder="Müşteri adı veya cari kod ile filtrele..."
           value={filter}
-          onChange={handleFilterChange}
+          onChange={(e) => setFilter(e.target.value)}
         />
-      </FilterContainer>
-      <Table stickyHeader size="small">
-        <TableHead>
-          <TableRow>
-            <StyledTableCell>
-              <TableSortLabel
-                active={orderBy === 'Müşteri Adı'}
-                direction={orderBy === 'Müşteri Adı' ? order : 'asc'}
-                onClick={() => handleSort('Müşteri Adı')}
-              >
-                Müşteri Adı
-              </TableSortLabel>
-            </StyledTableCell>
-            <StyledTableCell>
-              <TableSortLabel
-                active={orderBy === 'cariCode'}
-                direction={orderBy === 'cariCode' ? order : 'asc'}
-                onClick={() => handleSort('cariCode')}
-              >
-                Cari Kodu
-              </TableSortLabel>
-            </StyledTableCell>
-            <StyledTableCell align="right">Telefon</StyledTableCell>
-            <StyledTableCell align="right">E-posta</StyledTableCell>
-            {includeSpecialCases && (
-              <StyledTableCell align="right">Şantiye</StyledTableCell>
-            )}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {filteredCustomers.map((customer) => (
-            <TableRow
-              key={customer.id}
-              hover
-              onClick={() => onSelectCustomer(customer)}
-              style={{ cursor: 'pointer' }}
-            >
-              <StyledTableCell>{customer['Müşteri Adı']}</StyledTableCell>
-              <StyledTableCell>{customer.cariCode}</StyledTableCell>
-              <StyledTableCell align="right">{customer['Telefon']}</StyledTableCell>
-              <StyledTableCell align="right">{customer['E-posta']}</StyledTableCell>
-              {includeSpecialCases && (
-                <StyledTableCell align="right">{customer['Şantiye'] ? 'Evet' : 'Hayır'}</StyledTableCell>
-              )}
-            </TableRow>
-          ))}
-          {filteredCustomers.length === 0 && (
+      </FilterBox>
+      <StyledTableContainer component={Paper}>
+        <Table stickyHeader>
+          <TableHead>
             <TableRow>
-              <TableCell colSpan={includeSpecialCases ? 5 : 4} align="center">
-                Kayıt Bulunamadı
+              <TableCell>
+                <TableSortLabel
+                  active={orderBy === 'Müşteri Adı'}
+                  direction={orderBy === 'Müşteri Adı' ? order : 'asc'}
+                  onClick={() => handleSort('Müşteri Adı')}
+                >
+                  Müşteri/Şantiye Adı
+                </TableSortLabel>
               </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={orderBy === 'cariCode'}
+                  direction={orderBy === 'cariCode' ? order : 'asc'}
+                  onClick={() => handleSort('cariCode')}
+                >
+                  Cari Kod
+                </TableSortLabel>
+              </TableCell>
+              <TableCell align="right">Telefon</TableCell>
+              <TableCell align="right">E-posta</TableCell>
             </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </StyledTableContainer>
+          </TableHead>
+          <TableBody>
+            {sortedCustomers.map((customer) => (
+              <TableRow
+                key={customer.id}
+                hover
+                onClick={() => {
+                  setSelectedId(customer.id);
+                  onSelectCustomer(customer);
+                }}
+                sx={{
+                  cursor: 'pointer',
+                  ...(customer.isParent ? {
+                    backgroundColor: '#f5f5f5',
+                    fontWeight: 'bold',
+                  } : customer.isChild ? {
+                    paddingLeft: '20px',
+                    '& td:first-of-type': {
+                      paddingLeft: '32px',
+                    },
+                    fontStyle: 'italic',
+                    color: 'text.secondary',
+                    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+                  } : {}),
+                  // Seçili satır için özel stil
+                  ...(selectedId === customer.id && {
+                    backgroundColor: 'rgba(25, 118, 210, 0.08) !important',
+                    outline: '2px solid #1976d2',
+                  }),
+                  '&:hover': {
+                    backgroundColor: 'rgba(0, 0, 0, 0.08) !important'
+                  }
+                }}
+                selected={selectedId === customer.id}
+              >
+                <StyledTableCell>
+                  {customer['Müşteri Adı']}
+                  {customer.isChild && ' (Şantiye)'}
+                </StyledTableCell>
+                <StyledTableCell>{customer.cariCode}</StyledTableCell>
+                <StyledTableCell align="right">{customer.Telefon}</StyledTableCell>
+                <StyledTableCell align="right">{customer['E-posta']}</StyledTableCell>
+              </TableRow>
+            ))}
+            {sortedCustomers.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} align="center">
+                  Kayıt Bulunamadı
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </StyledTableContainer>
+    </>
   );
-};
-
-CustomerSelectionTable.propTypes = {
-  customers: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.string.isRequired,
-      'Müşteri Adı': PropTypes.string.isRequired,
-      cariCode: PropTypes.string.isRequired,
-      Telefon: PropTypes.string,
-      'E-posta': PropTypes.string,
-      Şantiye: PropTypes.oneOfType([PropTypes.string, PropTypes.bool]),
-    })
-  ),
-  onSelectCustomer: PropTypes.func.isRequired,
-  includeSpecialCases: PropTypes.bool,
 };
 
 export default CustomerSelectionTable;

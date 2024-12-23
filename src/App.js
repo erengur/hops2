@@ -5,16 +5,13 @@ import Signup from './components/Signup';
 import Dashboard from './components/Dashboard';
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false); // Giriş durumu kontrolü
   const [userEmail, setUserEmail] = useState(''); // Kullanıcının e-posta bilgisi
 
   const handleLogin = (email) => {
-    setIsLoggedIn(true);  // Giriş durumu true yapıldı
     setUserEmail(email);   // Kullanıcının e-posta bilgisi kaydedildi
   };
 
   const handleLogout = () => {
-    setIsLoggedIn(false); // Kullanıcı çıkış yapınca giriş durumu false yapılır
     setUserEmail('');
   };
 

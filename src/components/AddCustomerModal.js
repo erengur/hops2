@@ -44,6 +44,27 @@ const StyledIconButton = styled(IconButton)(({ theme }) => ({
   height: '30px',
 }));
 
+const fetchPendingCustomers = async (setError, setAlertOpen) => {
+  const db = getFirestore();
+  try {
+    const customerListRef = collection(db, 'müşteri listesi');
+    const pendingCustomersQuery = query(
+      customerListRef,
+      where('Onay', '==', 'Onay Bekliyor'),
+    );
+    const querySnapshot = await getDocs(pendingCustomersQuery);
+    const customers = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    return customers;
+  } catch (error) {
+    console.error('Onay bekleyen müşteriler getirilemedi:', error);
+    setError('Onay bekleyen müşteriler getirilemedi.');
+    setAlertOpen(true);
+  }
+};
+
 const AddCustomerModal = ({
   isOpen,
   onClose,
@@ -61,36 +82,19 @@ const AddCustomerModal = ({
   const [pendingCustomers, setPendingCustomers] = useState([]);
   const [isWarningModalOpen, setIsWarningModalOpen] = useState(false);
   const [tempCustomerData, setTempCustomerData] = useState(null);
+  // eslint-disable-next-line no-unused-vars
+  const [conflictingSantiye, setConflictingSantiye] = useState(null);
+  // eslint-disable-next-line no-unused-vars
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  const memoizedFetchPendingCustomers = useCallback(fetchPendingCustomers, [setError, setAlertOpen]);
 
   useEffect(() => {
-    if (isOpen) {
-      fetchPendingCustomers();
-    }
-  }, [isOpen]);
-
-  const fetchPendingCustomers = useCallback(async () => {
-    const db = getFirestore();
-    try {
-      const customerListRef = collection(db, 'müşteri listesi');
-      const pendingCustomersQuery = query(
-        customerListRef,
-        where('Onay', '==', 'Onay Bekliyor'),
-      );
-      const querySnapshot = await getDocs(pendingCustomersQuery);
-      const customers = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setPendingCustomers(customers);
-    } catch (error) {
-      console.error('Pending customers could not be fetched:', error);
-      setError('Onay bekleyen müşteriler getirilemedi.');
-      setAlertOpen(true);
-    }
-  }, [setError, setAlertOpen]);
+    memoizedFetchPendingCustomers().then(setPendingCustomers);
+  }, [memoizedFetchPendingCustomers]);
 
   const handleAddNewCustomer = async () => {
-    if (!newCustomerName.trim()) {
+    if (!newCustomerName.trim() || !newCustomerCariCode.trim()) {
       setTempCustomerData({
         customerName: newCustomerName,
         phoneNumber: newCustomerPhone,
@@ -99,17 +103,6 @@ const AddCustomerModal = ({
       setIsWarningModalOpen(true);
       return;
     }
-  
-    if (!newCustomerCariCode.trim()) {
-      setTempCustomerData({
-        customerName: newCustomerName,
-        phoneNumber: newCustomerPhone,
-        email: newCustomerEmail,
-      });
-      setIsWarningModalOpen(true);
-      return;
-    }
-  
     await checkConflictsAndAdd();
   };
 
@@ -178,7 +171,7 @@ const AddCustomerModal = ({
   const addCustomerToFirestore = async () => {
     const db = getFirestore();
     try {
-      const docRef = await addDoc(collection(db, 'müşteri listesi'), {
+      await addDoc(collection(db, 'müşteri listesi'), {
         'Müşteri Adı': newCustomerName.trim(),
         Telefon: (newCustomerPhone || '').trim(),
         'E-posta': (newCustomerEmail || '').trim(),
@@ -224,7 +217,7 @@ const AddCustomerModal = ({
       setAlertOpen(true);
       return;
     }
-  
+
     setIsWarningModalOpen(false);
     await checkConflictsAndAdd();
   };
@@ -307,45 +300,45 @@ const AddCustomerModal = ({
         }}
       />
 
-<Modal open={isWarningModalOpen} onClose={handleWarningModalClose}>
-  <ModalBox>
-    <Typography variant="h6" gutterBottom>
-      Uyarı: Eksik Bilgi
-    </Typography>
-    <Typography variant="body1" gutterBottom>
-      {!newCustomerName.trim() ? "Müşteri adı " : ""}
-      {!newCustomerName.trim() && !newCustomerCariCode.trim() ? "ve " : ""}
-      {!newCustomerCariCode.trim() ? "Cari kodu " : ""}
-      gereklidir. Lütfen ekleyin.
-    </Typography>
-    <Box display="flex" alignItems="center" mt={2}>
-      <Typography variant="body2" style={{ marginRight: '10px', flexGrow: 1 }}>
-        {tempCustomerData?.customerName || "Müşteri Adı"} - {tempCustomerData?.phoneNumber || "Telefon"}
-      </Typography>
-      {!newCustomerName.trim() && (
-        <TextField
-          label="Müşteri Adı"
-          value={newCustomerName}
-          onChange={(e) => setNewCustomerName(e.target.value)}
-          style={{ width: '150px', marginRight: '10px' }}
-        />
-      )}
-      {!newCustomerCariCode.trim() && (
-        <TextField
-          label="Cari Kodu"
-          value={newCustomerCariCode}
-          onChange={(e) => setNewCustomerCariCode(e.target.value)}
-          style={{ width: '150px' }}
-        />
-      )}
-    </Box>
-    <Box mt={2} display="flex" justifyContent="flex-end">
-      <Button variant="contained" color="primary" onClick={handleCariCodeSubmit}>
-        Kaydet
-      </Button>
-    </Box>
-  </ModalBox>
-</Modal>
+      <Modal open={isWarningModalOpen} onClose={handleWarningModalClose}>
+        <ModalBox>
+          <Typography variant="h6" gutterBottom>
+            Uyarı: Eksik Bilgi
+          </Typography>
+          <Typography variant="body1" gutterBottom>
+            {!newCustomerName.trim() ? "Müşteri adı " : ""}
+            {!newCustomerName.trim() && !newCustomerCariCode.trim() ? "ve " : ""}
+            {!newCustomerCariCode.trim() ? "Cari kodu " : ""}
+            gereklidir. Lütfen ekleyin.
+          </Typography>
+          <Box display="flex" alignItems="center" mt={2}>
+            <Typography variant="body2" style={{ marginRight: '10px', flexGrow: 1 }}>
+              {tempCustomerData?.customerName || "Müşteri Adı"} - {tempCustomerData?.phoneNumber || "Telefon"}
+            </Typography>
+            {!newCustomerName.trim() && (
+              <TextField
+                label="Müşteri Adı"
+                value={newCustomerName}
+                onChange={(e) => setNewCustomerName(e.target.value)}
+                style={{ width: '150px', marginRight: '10px' }}
+              />
+            )}
+            {!newCustomerCariCode.trim() && (
+              <TextField
+                label="Cari Kodu"
+                value={newCustomerCariCode}
+                onChange={(e) => setNewCustomerCariCode(e.target.value)}
+                style={{ width: '150px' }}
+              />
+            )}
+          </Box>
+          <Box mt={2} display="flex" justifyContent="flex-end">
+            <Button variant="contained" color="primary" onClick={handleCariCodeSubmit}>
+              Kaydet
+            </Button>
+          </Box>
+        </ModalBox>
+      </Modal>
     </>
   );
 };

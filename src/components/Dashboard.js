@@ -10,7 +10,8 @@ import MusteriListesi from './MusteriListesi';
 import MakineTanımlama from './MakineTanımlama';
 import OnayBekleyenCari from './OnayBekleyenCari';
 import FirmaBilgileriGuncelle from './FirmaBilgileriGuncelle';
-import Raporlama from './Raporlama'; // Yeni eklenen import
+import Raporlama from './Raporlama';
+import ExcelRaporlama from './ExcelRaporlama';
 
 const Dashboard = ({ userEmail, onSignOut }) => {
   const navigate = useNavigate();
@@ -88,27 +89,20 @@ const Dashboard = ({ userEmail, onSignOut }) => {
 
   const renderContent = () => {
     switch (activeSection) {
-      case 'operatorEkle':
-        return <OperatorEkle />;
       case 'puantajlar':
         return <Puantajlar />;
       case 'raporlama':
-        return <Raporlama theme={theme} />; // Theme prop'unu ekledik
+        return <Raporlama theme={theme} />;
       case 'makineTanitma':
         return <MakineTanımlama />;
+      case 'operatorEkle':
+        return <OperatorEkle />;
       case 'musteriListesi':
-        return <MusteriListesi theme={theme} />;
-      case 'bankaTanitma':
-        return <div>Banka Tanıtım sayfası burada olacak.</div>;
+        return <MusteriListesi />;
       case 'onayBekleyenCari':
-        return <OnayBekleyenCari theme={theme} />;
+        return <OnayBekleyenCari />;
       default:
-        return (
-          <div className="welcome-message">
-            <h1>Dashboard'a Hoşgeldiniz</h1>
-            <p>Lütfen menüden bir seçenek seçin.</p>
-          </div>
-        );
+        return null;
     }
   };
 

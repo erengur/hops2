@@ -1,6 +1,5 @@
-// src/components/DeleteSantiyeModal.js
-
-import React from 'react';
+// DeleteSantiyeModal.js
+import React, { useState } from 'react';
 import {
   Modal,
   Typography,
@@ -18,18 +17,19 @@ import {
   getDocs,
   writeBatch,
 } from 'firebase/firestore';
+import TransferCustomerModal from './TransferCustomerModal';
 
 const ModalBox = styled(Box)(({ theme }) => ({
   position: 'absolute',
   top: '50%',
   left: '50%',
   transform: 'translate(-50%, -50%)',
-  width: 500,
+  width: 600,
   backgroundColor: '#ffffff',
   color: '#000000',
   boxShadow: theme.shadows[5],
   padding: theme.spacing(4),
-  maxHeight: '80vh',
+  maxHeight: '90vh',
   overflowY: 'auto',
   border: '1px solid #ccc',
 }));
@@ -43,47 +43,33 @@ const DeleteSantiyeModal = ({
   setAlertOpen,
   setError,
   setSuccessMessage,
+  onTransfer
 }) => {
-  const handleDeleteSantiye = async () => {
+  const handleDeleteOnly = async () => {
     const db = getFirestore();
     try {
-      // Delete Şantiye Document
       await deleteDoc(doc(db, 'müşteri listesi', selectedSantiye.id));
 
-      const batch = writeBatch(db);
-
-      // Update Puantajlar where 'Müşteri Adı' matches the şantiye name
       const puantajlarRef = collection(db, 'puantajlar');
       const puantajQuery = query(
         puantajlarRef,
-        where('Müşteri Adı', '==', selectedSantiye['Müşteri Adı'])
+        where('Müşteri Adı', '==', selectedSantiye['Şantiye Adı'])
       );
       const puantajlarSnapshot = await getDocs(puantajQuery);
 
+      const batch = writeBatch(db);
       puantajlarSnapshot.forEach((puantajDoc) => {
         batch.update(puantajDoc.ref, {
           'Müşteri Adı': 'Silinmiş Şantiye',
-        });
-      });
-
-      // Update Puantajlar where 'Cari Kodu' matches the şantiye cari code
-      const puantajCariQuery = query(
-        puantajlarRef,
-        where('Cari Kodu', '==', selectedSantiye['cariCode'])
-      );
-      const puantajCariSnapshot = await getDocs(puantajCariQuery);
-
-      puantajCariSnapshot.forEach((puantajDoc) => {
-        batch.update(puantajDoc.ref, {
           'Cari Kodu': '',
         });
       });
-
       await batch.commit();
 
       setCustomerShantiyeler(
         customerShantiyeler.filter((santiye) => santiye.id !== selectedSantiye.id)
       );
+      
       setSuccessMessage('Şantiye başarıyla silindi.');
       setAlertOpen(true);
       onClose();
@@ -103,7 +89,7 @@ const DeleteSantiyeModal = ({
         {selectedSantiye && (
           <Box mb={2}>
             <Typography>
-              <strong>Şantiye Adı:</strong> {selectedSantiye['Müşteri Adı']}
+              <strong>Şantiye Adı:</strong> {selectedSantiye['Şantiye Adı']}
             </Typography>
             <Typography>
               <strong>Telefon:</strong> {selectedSantiye['Telefon']}
@@ -112,27 +98,35 @@ const DeleteSantiyeModal = ({
               <strong>E-posta:</strong> {selectedSantiye['E-posta']}
             </Typography>
             <Typography>
-              <strong>Cari Kodu:</strong> {selectedSantiye['cariCode']}
+              <strong>Cari Kodu:</strong> {selectedSantiye['Şantiye Cari Kodu']}
             </Typography>
           </Box>
         )}
+
         <Typography color="error" mb={2}>
-          Bu şantiyeyi silerseniz, ilgili puantaj verileri de kaybolacaktır. Devam etmek istediğinize emin misiniz?
+          Bu şantiyeyi sildiğinizde, ilgili puantaj verileri kaybolacaktır.
         </Typography>
-        <Box mt={2} display="flex" justifyContent="flex-end">
-          <Button
-            variant="contained"
-            color="secondary"
-            onClick={handleDeleteSantiye}
-            style={{ marginRight: '10px' }}
-          >
-            Sil
+
+        <Box mt={2} display="flex" justifyContent="flex-end" gap={2}>
+          <Button variant="outlined" onClick={onClose}>
+            İptal
           </Button>
           <Button
             variant="contained"
-            onClick={onClose}
+            color="primary"
+            onClick={() => {
+              onClose();
+              onTransfer(selectedSantiye);
+            }}
           >
-            İptal
+            Verileri Taşı
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleDeleteOnly}
+          >
+            Sil
           </Button>
         </Box>
       </ModalBox>
