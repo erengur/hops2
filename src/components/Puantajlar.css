@@ -144,22 +144,22 @@
 
 /* Seçili PDF'leri İndir Butonu */
 .download-button-inline {
-  padding: 8px 12px;
-  background-color: #28a745;
+  background-color: #4CAF50;
   color: white;
+  padding: 8px 16px;
   border: none;
-  border-radius: 3px;
-  font-size: 14px;
+  border-radius: 4px;
   cursor: pointer;
+  transition: background-color 0.3s;
 }
 
 .download-button-inline:disabled {
-  background-color: #ccc;
+  background-color: #cccccc;
   cursor: not-allowed;
 }
 
 .download-button-inline:hover:not(:disabled) {
-  background-color: #218838;
+  background-color: #45a049;
 }
 
 /* Right Buttons */
@@ -551,4 +551,48 @@ input[type="checkbox"]:checked::before {
 .link-button {
   font-size: inherit;
   padding: 2px 4px;
+}
+
+/* Alert stilleri */
+.alert {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 15px 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 1000;
+  animation: slideIn 0.3s ease-out;
+}
+
+.alert-success {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.alert-error {
+  background-color: #f44336;
+  color: white;
+}
+
+.alert button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 5px;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }

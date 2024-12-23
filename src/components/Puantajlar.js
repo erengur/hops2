@@ -10,6 +10,8 @@ import './Puantajlar.css';
 
 import Select from 'react-select';
 import { debounce } from 'lodash';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 
 registerLocale('tr', tr);
 
@@ -60,6 +62,9 @@ const Puantajlar = () => {
   const [shantiyeler, setShantiyeler] = useState([]);
 
   const [shantiyeChanges, setShantiyeChanges] = useState({});
+
+  const [successMessage, setSuccessMessage] = useState('');
+  const [alertOpen, setAlertOpen] = useState(false);
 
   const debouncedSetStartDate = useMemo(
     () => debounce((date) => setStartDate(date), 300),
@@ -371,32 +376,41 @@ const Puantajlar = () => {
     );
   }, []);
 
-  const handleDownloadSelected = useCallback(async () => {
+  const handleDownloadSelected = async () => {
     if (selectedPdfs.length === 0) return;
 
-    for (const pdfName of selectedPdfs) {
-      try {
+    try {
+      setLoading(true);
+      const zip = new JSZip();
+      
+      // Seçili PDF'leri indir
+      const downloadPromises = selectedPdfs.map(async (pdfName) => {
         const pdfRef = ref(storage, `pdfs/${pdfName}`);
         const url = await getDownloadURL(pdfRef);
-
         const response = await fetch(url);
         const blob = await response.blob();
+        
+        // PDF'i zip'e ekle
+        zip.file(pdfName, blob);
+      });
 
-        const blobUrl = URL.createObjectURL(blob);
+      await Promise.all(downloadPromises);
 
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = pdfName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+      // Zip dosyasını oluştur ve indir
+      const content = await zip.generateAsync({ type: "blob" });
+      const timestamp = new Date().toISOString().split('T')[0];
+      saveAs(content, `puantajlar_${timestamp}.zip`);
 
-        URL.revokeObjectURL(blobUrl);
-      } catch (error) {
-        console.error(`${pdfName} indirilirken hata oluştu:`, error);
-      }
+      setLoading(false);
+      setSuccessMessage('PDF\'ler başarıyla indirildi.');
+      setAlertOpen(true);
+    } catch (error) {
+      console.error('PDF indirme hatası:', error);
+      setError('PDF\'ler indirilirken bir hata oluştu');
+      setAlertOpen(true);
+      setLoading(false);
     }
-  }, [selectedPdfs]);
+  };
 
   const handleSelectAll = useCallback(() => {
     const allPdfNames = filteredData.map((item) => item.pdfName);
@@ -603,10 +617,10 @@ const Puantajlar = () => {
           <button onClick={handleDeselectAll}>Seçimleri Kaldır</button>
           <button
             onClick={handleDownloadSelected}
-            disabled={selectedPdfs.length === 0}
+            disabled={selectedPdfs.length === 0 || loading}
             className="download-button-inline"
           >
-            Seçili PDF'leri İndir
+            {loading ? 'İndiriliyor...' : `Seçili PDF'leri İndir (${selectedPdfs.length})`}
           </button>
         </div>
 
@@ -727,6 +741,13 @@ const Puantajlar = () => {
               Kapat
             </button>
           </div>
+        </div>
+      )}
+
+      {alertOpen && (
+        <div className={`alert ${error ? 'alert-error' : 'alert-success'}`}>
+          <span>{error || successMessage}</span>
+          <button onClick={() => setAlertOpen(false)}>×</button>
         </div>
       )}
     </div>
