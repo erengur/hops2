@@ -12,6 +12,7 @@ import Select from 'react-select';
 import { debounce } from 'lodash';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import { PDFDocument } from 'pdf-lib';
 
 registerLocale('tr', tr);
 
@@ -65,6 +66,8 @@ const Puantajlar = () => {
 
   const [successMessage, setSuccessMessage] = useState('');
   const [alertOpen, setAlertOpen] = useState(false);
+
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
   const debouncedSetStartDate = useMemo(
     () => debounce((date) => setStartDate(date), 300),
@@ -376,39 +379,102 @@ const Puantajlar = () => {
     );
   }, []);
 
-  const handleDownloadSelected = async () => {
+  // PDF'leri birleştirme fonksiyonu
+  const mergePDFs = async (pdfBlobs) => {
+    const mergedPdf = await PDFDocument.create();
+    
+    for (const blob of pdfBlobs) {
+      const arrayBuffer = await blob.arrayBuffer();
+      const pdf = await PDFDocument.load(arrayBuffer);
+      const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+      copiedPages.forEach((page) => mergedPdf.addPage(page));
+    }
+    
+    const mergedPdfFile = await mergedPdf.save();
+    return new Blob([mergedPdfFile], { type: 'application/pdf' });
+  };
+
+  // İndirme seçenekleri modalı
+  const DownloadOptionsModal = () => (
+    <div className="modal download-options-modal" onClick={() => setIsDownloadModalOpen(false)}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <h3>PDF İndirme Seçenekleri</h3>
+        <div className="download-options">
+          <button onClick={handleDownloadAsZip} disabled={loading}>
+            <span>ZIP olarak indir</span>
+            {loading && <span className="loading-spinner"></span>}
+          </button>
+          <button onClick={handleDownloadAsMergedPDF} disabled={loading}>
+            <span>Tek PDF olarak indir</span>
+            {loading && <span className="loading-spinner"></span>}
+          </button>
+        </div>
+        <button onClick={() => setIsDownloadModalOpen(false)} className="close-button">
+          Kapat
+        </button>
+      </div>
+    </div>
+  );
+
+  const handleDownloadAsZip = async () => {
     if (selectedPdfs.length === 0) return;
 
     try {
       setLoading(true);
       const zip = new JSZip();
       
-      // Seçili PDF'leri indir
       const downloadPromises = selectedPdfs.map(async (pdfName) => {
         const pdfRef = ref(storage, `pdfs/${pdfName}`);
         const url = await getDownloadURL(pdfRef);
         const response = await fetch(url);
         const blob = await response.blob();
-        
-        // PDF'i zip'e ekle
         zip.file(pdfName, blob);
       });
 
       await Promise.all(downloadPromises);
-
-      // Zip dosyasını oluştur ve indir
       const content = await zip.generateAsync({ type: "blob" });
       const timestamp = new Date().toISOString().split('T')[0];
       saveAs(content, `puantajlar_${timestamp}.zip`);
 
-      setLoading(false);
       setSuccessMessage('PDF\'ler başarıyla indirildi.');
       setAlertOpen(true);
     } catch (error) {
       console.error('PDF indirme hatası:', error);
       setError('PDF\'ler indirilirken bir hata oluştu');
       setAlertOpen(true);
+    } finally {
       setLoading(false);
+      setIsDownloadModalOpen(false);
+    }
+  };
+
+  const handleDownloadAsMergedPDF = async () => {
+    if (selectedPdfs.length === 0) return;
+
+    try {
+      setLoading(true);
+      const pdfBlobs = await Promise.all(
+        selectedPdfs.map(async (pdfName) => {
+          const pdfRef = ref(storage, `pdfs/${pdfName}`);
+          const url = await getDownloadURL(pdfRef);
+          const response = await fetch(url);
+          return response.blob();
+        })
+      );
+
+      const mergedPdfBlob = await mergePDFs(pdfBlobs);
+      const timestamp = new Date().toISOString().split('T')[0];
+      saveAs(mergedPdfBlob, `birlesik_puantajlar_${timestamp}.pdf`);
+
+      setSuccessMessage('PDF\'ler başarıyla birleştirildi ve indirildi.');
+      setAlertOpen(true);
+    } catch (error) {
+      console.error('PDF birleştirme hatası:', error);
+      setError('PDF\'ler birleştirilirken bir hata oluştu');
+      setAlertOpen(true);
+    } finally {
+      setLoading(false);
+      setIsDownloadModalOpen(false);
     }
   };
 
@@ -616,7 +682,7 @@ const Puantajlar = () => {
           <button onClick={handleSelectAll}>Hepsini Seç</button>
           <button onClick={handleDeselectAll}>Seçimleri Kaldır</button>
           <button
-            onClick={handleDownloadSelected}
+            onClick={() => setIsDownloadModalOpen(true)}
             disabled={selectedPdfs.length === 0 || loading}
             className="download-button-inline"
           >
@@ -750,6 +816,8 @@ const Puantajlar = () => {
           <button onClick={() => setAlertOpen(false)}>×</button>
         </div>
       )}
+
+      {isDownloadModalOpen && <DownloadOptionsModal />}
     </div>
   );
 };
