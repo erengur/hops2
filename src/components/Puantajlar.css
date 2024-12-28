@@ -144,22 +144,22 @@
 
 /* Seçili PDF'leri İndir Butonu */
 .download-button-inline {
-  background-color: #4CAF50;
+  padding: 8px 12px;
+  background-color: #28a745;
   color: white;
-  padding: 8px 16px;
   border: none;
-  border-radius: 4px;
+  border-radius: 3px;
+  font-size: 14px;
   cursor: pointer;
-  transition: background-color 0.3s;
 }
 
 .download-button-inline:disabled {
-  background-color: #cccccc;
+  background-color: #ccc;
   cursor: not-allowed;
 }
 
 .download-button-inline:hover:not(:disabled) {
-  background-color: #45a049;
+  background-color: #218838;
 }
 
 /* Right Buttons */
@@ -219,6 +219,22 @@
   font-weight: bold;
   color: #fff;
   white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  padding-right: 20px; /* Ok işareti için yer aç */
+}
+
+.puantajlar-table th:first-child {
+  cursor: default;
+}
+
+.puantajlar-table th:last-child {
+  cursor: default;
+}
+
+.puantajlar-table th:hover:not(:first-child):not(:last-child) {
+  background-color: #0056b3;
 }
 
 .puantajlar-table tr:nth-child(even) {
@@ -226,10 +242,21 @@
 }
 
 /* Cari Kod kolonu için özel stiller */
+.puantajlar-table th:nth-child(3),
+.puantajlar-table td:nth-child(3) {
+  min-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Sözleşme numarası sütunu için stil (artık 4. sütun) */
 .puantajlar-table th:nth-child(4),
 .puantajlar-table td:nth-child(4) {
   min-width: 120px;
-  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Tik Kutuları (Checkbox) */
@@ -260,58 +287,114 @@ input[type="checkbox"]:checked::before {
   color: white;
 }
 
-/* Link Button (PDF Sözleşme Numarası) */
+/* Link Button (Sözleşme Numarası) */
 .link-button {
   background: none;
   border: none;
   color: #007bff;
   text-decoration: underline;
   cursor: pointer;
-  font-size: 16px;
   padding: 0;
   margin: 0;
   transition: color 0.3s ease;
+  font-size: inherit;
+  font-family: inherit;
+  text-align: left;
+  display: block;
+  width: 100%;
 }
 
 .link-button:hover {
   color: #0056b3;
+  text-decoration: underline;
 }
 
-/* PDF Popup */
+.link-button:focus {
+  outline: none;
+  color: #0056b3;
+}
+
+/* Sözleşme numarası sütunu için stil */
+.puantajlar-table th:nth-child(3),
+.puantajlar-table td:nth-child(3) {
+  min-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* PDF popup stilleri */
 .pdf-popup {
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   background-color: white;
-  padding: 20px;
-  border-radius: 10px;
-  width: 80%;
+  padding: 15px;
+  border-radius: 8px;
+  width: 70%;
   max-width: 800px;
-  height: 80%;
-  max-height: 800px;
-  overflow: hidden;
+  height: 70vh;
   z-index: 1000;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+}
+
+/* PDF popup arka planı */
+.pdf-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+}
+
+.pdf-popup .pdf-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.pdf-popup .pdf-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.pdf-popup .close-button {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #666;
+  padding: 5px;
+  margin: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.pdf-popup .close-button:hover {
+  background-color: #f0f0f0;
+  color: #333;
 }
 
 .pdf-popup iframe {
-  border: none;
+  flex: 1;
   width: 100%;
-  height: calc(100% - 50px);
-}
-
-.pdf-popup button {
-  margin-top: 10px;
-  padding: 5px 10px;
-  background-color: #007bff;
-  color: white;
   border: none;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-.pdf-popup button:hover {
-  background-color: #0056b3;
+  border-radius: 4px;
+  background-color: #f5f5f5;
 }
 
 /* Hakediş Popup Stili */
@@ -551,155 +634,4 @@ input[type="checkbox"]:checked::before {
 .link-button {
   font-size: inherit;
   padding: 2px 4px;
-}
-
-/* Alert stilleri */
-.alert {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  padding: 15px 20px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  z-index: 1000;
-  animation: slideIn 0.3s ease-out;
-}
-
-.alert-success {
-  background-color: #4CAF50;
-  color: white;
-}
-
-.alert-error {
-  background-color: #f44336;
-  color: white;
-}
-
-.alert button {
-  background: none;
-  border: none;
-  color: white;
-  font-size: 20px;
-  cursor: pointer;
-  padding: 0 5px;
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-/* İndirme seçenekleri modalı */
-.download-options-modal .modal-content {
-  max-width: 400px;
-  background-color: white;
-  border-radius: 8px;
-  padding: 24px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  position: relative;
-}
-
-.download-options-modal h3 {
-  color: #333;
-  margin-bottom: 20px;
-  font-size: 20px;
-}
-
-.download-options {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin: 20px 0;
-}
-
-.download-options button {
-  padding: 14px 20px;
-  border: none;
-  border-radius: 6px;
-  background-color: #4CAF50;
-  color: white;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-size: 15px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.download-options button:hover {
-  background-color: #45a049;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.download-options button:active {
-  transform: translateY(0);
-}
-
-.download-options button:disabled {
-  background-color: #cccccc;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-/* Kapat butonu */
-.modal .close-button {
-  margin-top: 16px;
-  padding: 10px 24px;
-  border: 2px solid #e0e0e0;
-  border-radius: 6px;
-  background-color: white;
-  color: #666;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-size: 15px;
-  font-weight: 500;
-}
-
-.modal .close-button:hover {
-  background-color: #f5f5f5;
-  border-color: #d0d0d0;
-  color: #333;
-}
-
-.modal .close-button:active {
-  background-color: #eeeeee;
-}
-
-/* Dark mode desteği */
-@media (prefers-color-scheme: dark) {
-  .download-options-modal .modal-content {
-    background-color: #2d2d2d;
-    border: 1px solid #404040;
-  }
-
-  .download-options-modal h3 {
-    color: #fff;
-  }
-
-  .modal .close-button {
-    background-color: #2d2d2d;
-    border-color: #404040;
-    color: #fff;
-  }
-
-  .modal .close-button:hover {
-    background-color: #3d3d3d;
-    border-color: #505050;
-  }
-
-  .modal .close-button:active {
-    background-color: #454545;
-  }
 }

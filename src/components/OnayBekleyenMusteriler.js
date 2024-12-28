@@ -39,7 +39,7 @@ const OnayBekleyenMusteriler = () => {
   useEffect(() => {
     const db = getFirestore();
     const unsubscribe = onSnapshot(
-      collection(db, 'müşteri listesi'),
+      collection(db, `users/${auth.currentUser?.email}/customerList`),
       (snapshot) => {
         const customerData = snapshot.docs.map((doc) => ({
           id: doc.id,

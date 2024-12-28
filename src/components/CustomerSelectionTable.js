@@ -12,6 +12,8 @@ import {
   Box,
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
+import { auth } from './firebaseConfig';
+import { collection } from 'firebase/firestore';
 
 const StyledTableContainer = styled(TableContainer)({
   maxHeight: '400px',
@@ -32,11 +34,15 @@ const FilterBox = styled(Box)({
   backgroundColor: '#fff',
 });
 
-const CustomerSelectionTable = ({ customers = [], onSelectCustomer }) => {
+const CustomerSelectionTable = ({ customers = [], onSelectCustomer, selectedId }) => {
   const [orderBy, setOrderBy] = useState('Müşteri Adı');
   const [order, setOrder] = useState('asc');
   const [filter, setFilter] = useState('');
-  const [selectedId, setSelectedId] = useState(null);
+
+  const userEmail = auth.currentUser?.email;
+  if (!userEmail) {
+    return null;
+  }
 
   // Müşterileri ve şantiyeleri grupla
   const groupedCustomers = customers.reduce((acc, customer) => {
@@ -156,35 +162,21 @@ const CustomerSelectionTable = ({ customers = [], onSelectCustomer }) => {
             {sortedCustomers.map((customer) => (
               <TableRow
                 key={customer.id}
-                hover
-                onClick={() => {
-                  setSelectedId(customer.id);
-                  onSelectCustomer(customer);
-                }}
+                onClick={() => onSelectCustomer(customer)}
                 sx={{
                   cursor: 'pointer',
-                  ...(customer.isParent ? {
+                  '&:hover': {
                     backgroundColor: '#f5f5f5',
-                    fontWeight: 'bold',
-                  } : customer.isChild ? {
-                    paddingLeft: '20px',
-                    '& td:first-of-type': {
-                      paddingLeft: '32px',
-                    },
-                    fontStyle: 'italic',
-                    color: 'text.secondary',
-                    backgroundColor: 'rgba(0, 0, 0, 0.02)',
-                  } : {}),
+                  },
                   // Seçili satır için özel stil
                   ...(selectedId === customer.id && {
-                    backgroundColor: 'rgba(25, 118, 210, 0.08) !important',
-                    outline: '2px solid #1976d2',
-                  }),
-                  '&:hover': {
-                    backgroundColor: 'rgba(0, 0, 0, 0.08) !important'
-                  }
+                    backgroundColor: '#e3f2fd',
+                    borderLeft: '4px solid #1976d2',
+                    '&:hover': {
+                      backgroundColor: '#e3f2fd',
+                    }
+                  })
                 }}
-                selected={selectedId === customer.id}
               >
                 <StyledTableCell>
                   {customer['Müşteri Adı']}

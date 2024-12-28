@@ -19,8 +19,10 @@ import {
   doc,
   deleteDoc,
 } from 'firebase/firestore';
+import { auth } from './firebaseConfig';
 import ConflictResolutionModal from './ConflictResolutionModal';
 import CustomerSelectionTable from './CustomerSelectionTable';
+import { getCustomerListRef } from '../utils/databaseOperations';
 
 const ModalBox = styled(Box)(({ theme }) => ({
   position: 'absolute',
@@ -45,9 +47,17 @@ const StyledIconButton = styled(IconButton)(({ theme }) => ({
 }));
 
 const fetchPendingCustomers = async (setError, setAlertOpen) => {
+  const userEmail = auth.currentUser?.email;
   const db = getFirestore();
+  
+  if (!userEmail) {
+    setError('Kullanıcı oturumu bulunamadı');
+    setAlertOpen(true);
+    return [];
+  }
+
   try {
-    const customerListRef = collection(db, 'müşteri listesi');
+    const customerListRef = collection(db, `users/${auth.currentUser?.email}/customerList`);
     const pendingCustomersQuery = query(
       customerListRef,
       where('Onay', '==', 'Onay Bekliyor'),
@@ -107,9 +117,17 @@ const AddCustomerModal = ({
   };
 
   const checkConflictsAndAdd = async () => {
+    const userEmail = auth.currentUser?.email;
     const db = getFirestore();
+    
+    if (!userEmail) {
+      setError('Kullanıcı oturumu bulunamadı');
+      setAlertOpen(true);
+      return;
+    }
+
     try {
-      const customerListRef = collection(db, 'müşteri listesi');
+      const customerListRef = collection(db, `users/${auth.currentUser?.email}/customerList`);
       const nameConflictQuery = query(
         customerListRef,
         where('Müşteri Adı', '==', newCustomerName.trim())

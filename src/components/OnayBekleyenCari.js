@@ -10,6 +10,7 @@ import {
   Snackbar,
   Alert,
 } from '@mui/material';
+import { auth } from './firebaseConfig';
 
 import CustomerTable from './CustomerTable';
 import EditCustomerModal from './EditCustomerModal';
@@ -17,6 +18,7 @@ import EditSantiyeModal from './EditSantiyeModal';
 import DeleteCustomerModal from './DeleteCustomerModal';
 import DeleteSantiyeModal from './DeleteSantiyeModal';
 import TransferCustomerModal from './TransferCustomerModal';
+import AddSantiyeModal from './AddSantiyeModal';
 
 const OnayBekleyenCari = () => {
   const [pendingCustomers, setPendingCustomers] = useState([]);
@@ -35,11 +37,14 @@ const OnayBekleyenCari = () => {
   const [isDeleteSantiyeModalOpen, setIsDeleteSantiyeModalOpen] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [selectedCustomerForTransfer, setSelectedCustomerForTransfer] = useState(null);
+  const [isAddSantiyeModalOpen, setIsAddSantiyeModalOpen] = useState(false);
+  const [selectedCustomerForSantiye, setSelectedCustomerForSantiye] = useState(null);
 
   useEffect(() => {
     const db = getFirestore();
+    const customerListRef = collection(db, `users/${auth.currentUser?.email}/customerList`);
     const unsubscribe = onSnapshot(
-      collection(db, 'müşteri listesi'),
+      customerListRef,
       (snapshot) => {
         const customerData = snapshot.docs.map((doc) => ({
           id: doc.id,
@@ -124,6 +129,11 @@ const OnayBekleyenCari = () => {
     }));
   };
 
+  const handleAddAsSantiye = (customer) => {
+    setSelectedCustomerForSantiye(customer);
+    setIsAddSantiyeModalOpen(true);
+  };
+
   if (loading) {
     return (
       <Container>
@@ -154,6 +164,7 @@ const OnayBekleyenCari = () => {
         onDeleteSantiye={handleDeleteSantiye}
         onTransferSantiye={handleTransferSantiye}
         onTransferCustomer={handleTransferCustomer}
+        onAddAsSantiye={handleAddAsSantiye}
         type="pending"
       />
 
@@ -219,6 +230,18 @@ const OnayBekleyenCari = () => {
         setError={setError}
         setSuccessMessage={setSuccessMessage}
         isSantiyeTransfer={false}
+      />
+
+      <AddSantiyeModal
+        isOpen={isAddSantiyeModalOpen}
+        onClose={() => {
+          setIsAddSantiyeModalOpen(false);
+          setSelectedCustomerForSantiye(null);
+        }}
+        selectedCustomer={selectedCustomerForSantiye}
+        setAlertOpen={setAlertOpen}
+        setError={setError}
+        setSuccessMessage={setSuccessMessage}
       />
 
       <Snackbar

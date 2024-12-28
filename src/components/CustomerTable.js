@@ -34,41 +34,59 @@ const sortSantiyeByCariCode = (santiyeler) => {
   });
 };
 
-const CustomerTable = ({ 
-  customers, 
-  onEdit, 
-  onEditSantiye, 
-  onDelete,
-  onDeleteSantiye,
-  onTransferSantiye
-}) => {
+const CustomerTable = ({ customers = [], onEdit, onEditSantiye, onDelete, onDeleteSantiye, onTransferSantiye }) => {
   const [orderBy, setOrderBy] = useState('Müşteri Adı');
   const [order, setOrder] = useState('asc');
   const [openRows, setOpenRows] = useState({});
+
+  // toggleRow fonksiyonunu ekleyelim
+  const toggleRow = (id) => {
+    setOpenRows(prevState => ({ ...prevState, [id]: !prevState[id] }));
+  };
+
+  // Debug için log ekleyelim
+  console.log('CustomerTable received customers:', customers);
+
+  // Mevcut gruplama mantığını koruyalım
+  const groupedCustomers = customers.reduce((acc, customer) => {
+    if (!customer.parentId) {
+      if (!acc[customer.id]) {
+        acc[customer.id] = {
+          parent: customer,
+          children: []
+        };
+      } else {
+        acc[customer.id].parent = customer;
+      }
+    } else {
+      if (!acc[customer.parentId]) {
+        acc[customer.parentId] = {
+          parent: null,
+          children: [customer]
+        };
+      } else {
+        acc[customer.parentId].children.push(customer);
+      }
+    }
+    return acc;
+  }, {});
+
+  // Mevcut sıralama mantığını koruyalım
+  const sortedCustomers = Object.values(groupedCustomers)
+    .map(({ parent }) => parent)
+    .filter(Boolean)
+    .sort((a, b) => {
+      const comparison = (a[orderBy] || '').localeCompare(b[orderBy] || '');
+      return order === 'asc' ? comparison : -comparison;
+    });
+
+  // Debug için son hali logla
+  console.log('Final sorted customers:', sortedCustomers);
 
   const handleRequestSort = (property) => {
     const isAsc = orderBy === property && order === 'asc';
     setOrder(isAsc ? 'desc' : 'asc');
     setOrderBy(property);
-  };
-
-  const sortedCustomers = [...customers].sort((a, b) => {
-    if (orderBy === 'cariCode') {
-      return order === 'asc'
-        ? a.cariCode.localeCompare(b.cariCode, undefined, { numeric: true, sensitivity: 'base' })
-        : b.cariCode.localeCompare(a.cariCode, undefined, { numeric: true, sensitivity: 'base' });
-    } else {
-      return order === 'asc'
-        ? a['Müşteri Adı'].localeCompare(b['Müşteri Adı'])
-        : b['Müşteri Adı'].localeCompare(a['Müşteri Adı']);
-    }
-  }).map(customer => ({
-    ...customer,
-    şantiyeler: customer.şantiyeler ? sortSantiyeByCariCode(customer.şantiyeler) : []
-  }));
-
-  const toggleRow = (id) => {
-    setOpenRows(prevState => ({ ...prevState, [id]: !prevState[id] }));
   };
 
   const iconButtonStyles = {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import './MakineTanımlama.css';
+import { auth } from './firebaseConfig';
 
 const MakineTanımlama = () => {
   const [machines, setMachines] = useState([]);
@@ -21,7 +22,7 @@ const MakineTanımlama = () => {
     setLoading(true);
     const db = getFirestore();
     try {
-      const machinesSnapshot = await getDocs(collection(db, 'makineListesi'));
+      const machinesSnapshot = await getDocs(collection(db, `users/${auth.currentUser?.email}/machines`));
       const machineData = machinesSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),

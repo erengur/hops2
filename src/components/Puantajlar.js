@@ -2,6 +2,9 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { collection, onSnapshot, getDocs, query, where } from 'firebase/firestore';
 import { ref, getDownloadURL, listAll } from 'firebase/storage';
 import { database, storage } from './firebaseConfig';
+import { getFirestore } from 'firebase/firestore';
+import { auth } from './firebaseConfig';
+import { getCustomerListRef, getMachinesRef, getOperatorsRef, getPuantajlarRef } from '../utils/databaseOperations';
 
 import DatePicker, { registerLocale } from 'react-datepicker';
 import tr from 'date-fns/locale/tr';
@@ -41,12 +44,15 @@ const Puantajlar = () => {
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
 
+  // eslint-disable-next-line no-unused-vars
   const [customerOptions, setCustomerOptions] = useState([]);
   const [selectedCustomers, setSelectedCustomers] = useState([]);
 
+  // eslint-disable-next-line no-unused-vars
   const [machineOptions, setMachineOptions] = useState([]);
   const [selectedMachines, setSelectedMachines] = useState([]);
 
+  // eslint-disable-next-line no-unused-vars
   const [operatorOptions, setOperatorOptions] = useState([]);
   const [selectedOperators, setSelectedOperators] = useState([]);
 
@@ -59,7 +65,7 @@ const Puantajlar = () => {
 
   // const [isCalculating, setIsCalculating] = useState(false); // Commented out
 
-  const [customerMap, setCustomerMap] = useState({});
+  // eslint-disable-next-line no-unused-vars
   const [shantiyeler, setShantiyeler] = useState([]);
 
   const [shantiyeChanges, setShantiyeChanges] = useState({});
@@ -68,6 +74,8 @@ const Puantajlar = () => {
   const [alertOpen, setAlertOpen] = useState(false);
 
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+
+  const [customerMap, setCustomerMap] = useState({});
 
   const debouncedSetStartDate = useMemo(
     () => debounce((date) => setStartDate(date), 300),
@@ -85,111 +93,81 @@ const Puantajlar = () => {
   }, [shantiyeler]);
 
   useEffect(() => {
-    const db = database;
+    const fetchData = async () => {
+      const userEmail = auth.currentUser?.email;
+      
+      if (!userEmail) {
+        setError('Kullanıcı oturumu bulunamadı');
+        return;
+      }
 
-    const fetchCustomers = async () => {
       try {
-        const customerSnapshot = await getDocs(collection(db, 'müşteri listesi'));
-        const customerNameToCariCodeMap = {};
-        const shantiyelerList = [];
+        // Referansları al
+        const customerListRef = getCustomerListRef(userEmail);
+        const machinesRef = getMachinesRef(userEmail);
+        const operatorsRef = getOperatorsRef(userEmail);
 
-        customerSnapshot.docs.forEach((doc) => {
-          const data = doc.data();
-          const customerName = data['Müşteri Adı']?.trim() || '';
-          const cariCode = data['cariCode']?.trim() || '';
-          const isSantiye = data['Şantiye'] || '';
+        // Verileri çek
+        const [customerSnapshot, machineSnapshot, operatorSnapshot] = await Promise.all([
+          getDocs(customerListRef),
+          getDocs(machinesRef),
+          getDocs(operatorsRef)
+        ]);
 
-          if (customerName && cariCode) {
-            customerNameToCariCodeMap[customerName] = cariCode;
-          }
+        // Seçenekleri ayarla
+        const customerOptionsArray = customerSnapshot.docs
+          .map(doc => ({
+            value: doc.data()['Müşteri Adı']?.trim() || '',
+            label: `${doc.data()['Müşteri Adı']?.trim()} / ${doc.data()['cariCode']?.trim() || ''}`,
+            searchValue: doc.data()['Müşteri Adı']?.toLowerCase()
+          }))
+          .filter(option => option.value);
+        setCustomerOptions(customerOptionsArray);
 
-          if (isSantiye) {
-            shantiyelerList.push({ 'Müşteri Adı': customerName, 'cariCode': cariCode });
-          }
-        });
+        const machineOptionsArray = machineSnapshot.docs
+          .map(doc => ({
+            value: doc.data()['MakineAdı']?.trim() || '',
+            label: doc.data()['MakineAdı']?.trim(),
+            searchValue: doc.data()['MakineAdı']?.toLowerCase()
+          }))
+          .filter(option => option.value);
+        setMachineOptions(machineOptionsArray);
 
-        setCustomerMap(customerNameToCariCodeMap);
-        setShantiyeler(shantiyelerList);
+        const operatorOptionsArray = operatorSnapshot.docs
+          .map(doc => ({
+            value: doc.data()['name']?.trim() || '',
+            label: doc.data()['name']?.trim(),
+            searchValue: doc.data()['name']?.toLowerCase()
+          }))
+          .filter(option => option.value);
+        setOperatorOptions(operatorOptionsArray);
 
-        const customerOptionsArray = Object.keys(customerNameToCariCodeMap).map((customerName) => {
-          const cariCode = customerNameToCariCodeMap[customerName];
-          return {
-            value: customerName,
-            label: `${customerName} / ${cariCode}`,
-          };
-        });
-
-        setCustomerOptions(
-          customerOptionsArray.sort((a, b) => a.label.localeCompare(b.label))
-        );
       } catch (error) {
-        console.error('Müşteri verileri alınırken hata oluştu:', error);
-        setError('Müşteri verileri alınırken bir hata oluştu.');
+        console.error('Veriler yüklenirken hata:', error);
+        setError('Veriler yüklenirken bir hata oluştu');
       }
     };
 
-    const fetchMachineData = async () => {
-      try {
-        const machineSnapshot = await getDocs(collection(db, 'makineListesi'));
-        const machineDataSet = new Set();
-
-        machineSnapshot.docs.forEach((doc) => {
-          const data = doc.data();
-          const machineName = data['MakineAdı'] || '';
-          if (machineName) {
-            machineDataSet.add(machineName);
-          }
-        });
-
-        const machineOptionsArray = Array.from(machineDataSet).map((machine) => ({
-          value: machine,
-          label: machine,
-        }));
-
-        setMachineOptions(machineOptionsArray.sort((a, b) => a.label.localeCompare(b.label)));
-      } catch (error) {
-        console.error('Makine verileri alınırken hata oluştu:', error);
-      }
-    };
-
-    const fetchOperatorData = async () => {
-      try {
-        const operatorSnapshot = await getDocs(collection(db, 'operatorListesi'));
-        const operatorDataSet = new Set();
-
-        operatorSnapshot.docs.forEach((doc) => {
-          const data = doc.data();
-          const operatorName = data['name'] || '';
-          if (operatorName) {
-            operatorDataSet.add(operatorName);
-          }
-        });
-
-        const operatorOptionsArray = Array.from(operatorDataSet).map((operator) => ({
-          value: operator,
-          label: operator,
-        }));
-
-        setOperatorOptions(operatorOptionsArray.sort((a, b) => a.label.localeCompare(b.label)));
-      } catch (error) {
-        console.error('Operatör verileri alınırken hata oluştu:', error);
-      }
-    };
-
-    fetchCustomers();
-    fetchMachineData();
-    fetchOperatorData();
+    fetchData();
   }, []);
 
   useEffect(() => {
     const db = database;
-    const puantajlarRef = collection(db, 'puantajlar');
+    const puantajlarRef = collection(db, `users/${auth.currentUser?.email}/timeSheets`);
 
     const unsubscribe = onSnapshot(puantajlarRef, async (snapshot) => {
       try {
         const puantajlarData = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
+        }));
+
+        // Müşteri verilerini al
+        const customerListRef = collection(db, `users/${auth.currentUser?.email}/customerList`);
+        const customerSnapshot = await getDocs(customerListRef);
+        const customerData = customerSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
         }));
 
         console.log("Çekilen puantaj verileri:", puantajlarData);
@@ -199,65 +177,88 @@ const Puantajlar = () => {
 
         const merged = await Promise.all(
           pdfResult.items.map(async (itemRef) => {
+            // Puantaj eşleştirmesini geliştir
             const matchingPuantaj = puantajlarData.find(
-              (puantaj) => puantaj['Sözleşme Numarası'] === itemRef.name
+              (puantaj) => puantaj['Sözleşme Numarası'] === itemRef.name ||
+                          puantaj['SozlesmeNumarasi'] === itemRef.name ||
+                          puantaj['sozlesmeNumarasi'] === itemRef.name
             );
 
             let customerName = '-';
             let cariCode = '-';
+            let workDetail = '-';
+            let authorizedPerson = '-';
 
             if (matchingPuantaj) {
-              customerName = matchingPuantaj['Müşteri Adı']?.trim() || '-';
-              cariCode = matchingPuantaj['Cari Kodu']?.trim() || '-';
+              // Müşteri adı kontrolü
+              customerName = matchingPuantaj['Müşteri Adı']?.trim() || 
+                           matchingPuantaj['MusteriAdi']?.trim() || 
+                           matchingPuantaj['musteriAdi']?.trim() || '-';
 
+              // Cari kod kontrolü
+              cariCode = matchingPuantaj['Cari Kodu']?.trim() || 
+                        matchingPuantaj['CariKodu']?.trim() || 
+                        matchingPuantaj['cariKodu']?.trim() || 
+                        matchingPuantaj['cariCode']?.trim() || '-';
+
+              // Çalışma detayı kontrolü
+              workDetail = matchingPuantaj['Çalışma Detayı']?.trim() || 
+                          matchingPuantaj['CalismaDetayi']?.trim() || 
+                          matchingPuantaj['calismaDetayi']?.trim() || '-';
+
+              // Yetkili kişi kontrolü
+              authorizedPerson = matchingPuantaj['Yetkili Adı']?.trim() || 
+                               matchingPuantaj['YetkiliAdi']?.trim() || 
+                               matchingPuantaj['yetkiliAdi']?.trim() || '-';
+
+              // Cari kod bulunamadıysa müşteri listesinden bul
               if (!cariCode || cariCode === '-') {
-                if (customerName && customerMap[customerName]) {
-                  cariCode = customerMap[customerName];
+                  const matchingCustomer = customerData.find(
+                  customer => customer['Müşteri Adı']?.trim().toLowerCase() === customerName.toLowerCase()
+                  );
+                  if (matchingCustomer) {
+                    cariCode = matchingCustomer.cariCode || matchingCustomer['Cari Kodu'] || '-';
                 }
               }
 
-              if (customerName === 'Silinmiş Müşteri' && cariCode && cariCode !== '-') {
-                customerName = getSantiyeNameByCariCode(cariCode);
-              }
-            }
-
-            // Şantiye değişikliklerini kontrol et ve uygula
-            const shantiyeChange = Object.values(shantiyeChanges).find(
-              change => change.oldName === customerName
-            );
-            if (shantiyeChange) {
-              customerName = shantiyeChange.newName;
-              cariCode = shantiyeChange.newCariCode;
+              console.log('Puantaj eşleştirme detayları:', {
+                customerName,
+                cariCode,
+                workDetail,
+                authorizedPerson,
+                originalData: matchingPuantaj
+              });
             }
 
             return {
               pdfName: itemRef.name,
               pdfRef: itemRef,
-              customerName: customerName,
-              cariCode: cariCode,
+              customerName,
+              cariCode,
+              'Çalışma Detayı': workDetail,
+              'Yetkili Adı': authorizedPerson,
               ...(matchingPuantaj || {}),
             };
           })
         );
 
         console.log("Birleştirilmiş veriler:", merged);
-
         setAllData(merged);
         setLoading(false);
       } catch (error) {
-        console.error('Verileri yüklerken bir hata oluştu:', error);
-        setError('Verileri yüklerken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+        console.error('Verileri yüklerken hata:', error);
+        setError('Verileri yüklerken bir hata oluştu.');
         setLoading(false);
       }
     });
 
     return () => unsubscribe();
-  }, [customerMap, shantiyeler, shantiyeChanges, getSantiyeNameByCariCode]);
+  }, [customerMap]);
 
   // Şantiye değişikliklerini izleyen yeni useEffect
   useEffect(() => {
     const db = database;
-    const shantiyeRef = collection(db, 'müşteri listesi');
+    const shantiyeRef = collection(db, `users/${auth.currentUser?.email}/customerList`);
     const shantiyeQuery = query(shantiyeRef, where('Şantiye', '==', true));
 
     const unsubscribe = onSnapshot(shantiyeQuery, (snapshot) => {

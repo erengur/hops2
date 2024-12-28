@@ -16,6 +16,8 @@ import {
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { styled } from '@mui/material/styles';
+import { auth } from './firebaseConfig';
+import { transformFirestoreData } from '../utils/databaseOperations';
 
 import CustomerTable from './CustomerTable';
 import EditCustomerModal from './EditCustomerModal';
@@ -57,22 +59,28 @@ const MusteriListesi = () => {
 
   useEffect(() => {
     const db = getFirestore();
-    const unsubscribe = onSnapshot(
-      collection(db, 'müşteri listesi'),
-      (snapshot) => {
-        const customerData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-          'Müşteri Adı': doc.data()['Müşteri Adı'] || '',
-          cariCode: doc.data()['cariCode'] || '',
-          Şantiye: doc.data()['Şantiye'] || false,
-          parentId: doc.data().parentId || null,
-        }));
+    const userEmail = auth.currentUser?.email;
 
-        const approvedData = customerData.filter(customer => customer['Onay'] === 'Onaylandı');
+    if (!userEmail) {
+      setError('Kullanıcı oturumu bulunamadı');
+      return;
+    }
+
+    const customerListRef = collection(db, `users/${userEmail}/customerList`);
+    
+    const unsubscribe = onSnapshot(
+      customerListRef,
+      (snapshot) => {
+        const customerData = snapshot.docs.map(transformFirestoreData);
+        const approvedData = customerData.filter(customer => 
+          customer['Onay'] === 'Onaylandı' || customer['Onay'] === 'onaylandı'
+        );
+        
+        console.log('Tüm veriler:', customerData);
+        console.log('Filtrelenmiş veriler:', approvedData);
+        
         setApprovedCustomers(approvedData);
         
-        // Şantiyeleri filtrele ve state'e kaydet
         const santiyeler = approvedData.filter(customer => customer.Şantiye);
         setCustomerShantiyeler(santiyeler);
         
@@ -109,11 +117,13 @@ const MusteriListesi = () => {
   };
 
   const handleTransferSantiye = (santiye) => {
+    console.log('Transfer edilecek şantiye:', santiye);
     setSelectedCustomerForTransfer(santiye);
     setIsTransferModalOpen(true);
   };
 
   const handleTransferCustomer = (customer) => {
+    console.log('Transfer edilecek müşteri:', customer);
     setSelectedCustomerForTransfer(customer);
     setIsTransferModalOpen(true);
   };
@@ -175,19 +185,17 @@ const MusteriListesi = () => {
   return (
     <Container>
       <Typography variant="h4" gutterBottom>
-        Onaylanmış Müşteri Listesi
+        Cari Tanıtım
       </Typography>
 
       <SearchBox>
         <TextField
           fullWidth
-          size="small"
-          variant="outlined"
-          placeholder="Müşteri adı veya cari kod ile ara..."
+          placeholder="Müşteri adı veya cari kod ile arama yapın..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           InputProps={{
-            startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
+            startAdornment: <SearchIcon color="action" />,
           }}
         />
         <Button
@@ -199,16 +207,26 @@ const MusteriListesi = () => {
         </Button>
       </SearchBox>
 
-      <CustomerTable
-        customers={getFilteredCustomers()}
-        onEdit={openEditModal}
-        onEditSantiye={openEditSantiyeModal}
-        onDelete={openDeleteModal}
-        onDeleteSantiye={openDeleteSantiyeModal}
-        onTransferSantiye={handleTransferSantiye}
-        onTransferCustomer={handleTransferCustomer}
-        type="approved"
-      />
+      {loading ? (
+        <Typography>Yükleniyor...</Typography>
+      ) : error ? (
+        <Typography color="error">{error}</Typography>
+      ) : (
+        <CustomerTable
+          customers={approvedCustomers}
+          onEdit={openEditModal}
+          onEditSantiye={openEditSantiyeModal}
+          onDelete={openDeleteModal}
+          onDeleteSantiye={openDeleteSantiyeModal}
+          onTransferSantiye={handleTransferSantiye}
+          onTransferCustomer={handleTransferCustomer}
+        />
+      )}
+
+      <div style={{ display: 'none' }}>
+        <p>Onaylı Müşteri Sayısı: {approvedCustomers.length}</p>
+        <pre>{JSON.stringify(approvedCustomers, null, 2)}</pre>
+      </div>
 
       <EditCustomerModal
         isOpen={isEditModalOpen}

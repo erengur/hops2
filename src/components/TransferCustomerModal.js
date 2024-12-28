@@ -17,8 +17,10 @@ import {
   where,
   getDocs,
   writeBatch,
+  doc,
 } from 'firebase/firestore';
 import CustomerSelectionTable from './CustomerSelectionTable';
+import { auth } from './firebaseConfig';
 
 const ModalBox = styled(Box)(({ theme }) => ({
   position: 'absolute',
@@ -52,47 +54,53 @@ export const handleDataTransfer = async ({
 
   const db = getFirestore();
   const batch = writeBatch(db);
+  const userEmail = auth.currentUser?.email;
+
+  if (!userEmail) {
+    setError('Kullanıcı oturumu bulunamadı');
+    setAlertOpen(true);
+    return;
+  }
 
   try {
-    const puantajlarRef = collection(db, 'puantajlar');
+    const timeSheetsRef = collection(db, `users/${userEmail}/timeSheets`);
     const sourceName = isSantiyeTransfer 
-      ? sourceCustomer['Şantiye Adı'] || sourceCustomer['Müşteri Adı'] 
+      ? sourceCustomer['Şantiye Adı'] || sourceCustomer['Müşteri Adı']
       : sourceCustomer['Müşteri Adı'];
-    const targetName = isSantiyeTransfer 
-      ? targetCustomer['Şantiye Adı'] || targetCustomer['Müşteri Adı'] 
-      : targetCustomer['Müşteri Adı'];
-    const targetCari = isSantiyeTransfer
-      ? targetCustomer['Şantiye Cari Kodu'] || targetCustomer.cariCode
-      : targetCustomer.cariCode;
 
     const puantajQuery = query(
-      puantajlarRef,
+      timeSheetsRef,
       where('Müşteri Adı', '==', sourceName)
     );
-    const puantajlarSnapshot = await getDocs(puantajQuery);
 
-    puantajlarSnapshot.forEach((puantajDoc) => {
-      batch.update(puantajDoc.ref, {
-        'Müşteri Adı': targetName,
-        'Cari Kodu': targetCari,
+    const puantajSnapshot = await getDocs(puantajQuery);
+    const transferCount = puantajSnapshot.size;
+
+    puantajSnapshot.forEach((puantajDoc) => {
+      const puantajRef = doc(timeSheetsRef, puantajDoc.id);
+      batch.update(puantajRef, {
+        'Müşteri Adı': targetCustomer['Müşteri Adı'],
+        'Cari Kodu': targetCustomer.cariCode
       });
     });
 
     await batch.commit();
 
-    setSuccessMessage(
-      `${puantajlarSnapshot.size} adet puantaj verisi başarıyla aktarıldı.`
-    );
+    setSuccessMessage(`${transferCount} adet puantaj başarıyla taşındı.`);
     setAlertOpen(true);
+    if (onSuccess) onSuccess();
     
-    if (onSuccess) {
-      onSuccess(puantajlarSnapshot.size);
-    }
+    console.log('Transfer detayları:', {
+      kaynak: sourceName,
+      hedef: targetCustomer['Müşteri Adı'],
+      taşınanVeriSayısı: transferCount,
+      veritabanıYolu: `users/${userEmail}/timeSheets`
+    });
+
   } catch (error) {
-    console.error('Veri aktarımı sırasında hata oluştu:', error);
-    setError(`Veri aktarımı sırasında bir hata oluştu: ${error.message}`);
+    console.error('Veri transferi sırasında hata:', error);
+    setError('Veri transferi sırasında bir hata oluştu.');
     setAlertOpen(true);
-    throw error;
   }
 };
 
@@ -109,57 +117,39 @@ const TransferCustomerModal = ({
   const [selectedTargetCustomer, setSelectedTargetCustomer] = useState(null);
   const [availableCustomers, setAvailableCustomers] = useState([]);
 
-  const fetchAvailableCustomers = useCallback(async () => {
-    // Eğer selectedCustomer tanımlı değilse sorgu yapma:
-    if (!selectedCustomer) {
-      return;
-    }
-    const db = getFirestore();
-    try {
-      const baseQuery = collection(db, 'müşteri listesi');
-      const customerQuery = isSantiyeTransfer ? 
-        query(
-          baseQuery,
-          where('Onay', '==', 'Onaylandı'),
-          where('Şantiye', '==', true),
-          where('parentId', '==', selectedCustomer.parentId),
-          where('__name__', '!=', selectedCustomer.id)
-        ) :
-        query(
-          baseQuery,
-          where('Onay', '==', 'Onaylandı'),
-          where('__name__', '!=', selectedCustomer.id)
-        );
-
-      const snapshot = await getDocs(customerQuery);
-      
-      const customers = snapshot.docs.map(doc => {
-        const data = doc.data();
-        const musteriAdi = data['antiye Adı'] || data['Müşteri Adı'] || '';
-        const cari = data['Şantiye Cari Kodu'] || data.cariCode || '';
-        const parentId = data.parentId || '';
-        return {
-          id: doc.id,
-          'Müşteri Adı': musteriAdi,
-          cariCode: cari,
-          parentId: parentId
-        };
-      });
-
-      setAvailableCustomers(customers);
-    } catch (error) {
-      console.error('Veriler getirilirken hata oluştu:', error);
-      setError('Veriler getirilirken hata oluştu.');
-      setAlertOpen(true);
-    }
-  }, [selectedCustomer, setError, setAlertOpen, isSantiyeTransfer]);
-
   useEffect(() => {
+    const fetchAvailableCustomers = async () => {
+      const db = getFirestore();
+      const userEmail = auth.currentUser?.email;
+      
+      if (!userEmail) {
+        setError('Kullanıcı oturumu bulunamadı');
+        setAlertOpen(true);
+        return;
+      }
+
+      try {
+        const customerListRef = collection(db, `users/${userEmail}/customerList`);
+        const querySnapshot = await getDocs(customerListRef);
+        const customers = querySnapshot.docs
+          .map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }))
+          .filter(customer => customer.id !== selectedCustomer?.id);
+        
+        setAvailableCustomers(customers);
+      } catch (error) {
+        console.error('Müşteriler getirilirken hata:', error);
+        setError('Müşteriler getirilirken bir hata oluştu');
+        setAlertOpen(true);
+      }
+    };
+
     if (isOpen) {
       fetchAvailableCustomers();
-      setSelectedTargetCustomer(null);
     }
-  }, [isOpen, fetchAvailableCustomers]);
+  }, [isOpen, selectedCustomer?.id, setAlertOpen, setError]);
 
   const handleTransfer = () => handleDataTransfer({
     sourceCustomer: selectedCustomer,
@@ -212,6 +202,7 @@ const TransferCustomerModal = ({
             <CustomerSelectionTable
               customers={availableCustomers}
               onSelectCustomer={setSelectedTargetCustomer}
+              selectedId={selectedTargetCustomer?.id}
             />
           </Box>
         </Box>

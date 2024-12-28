@@ -9,6 +9,7 @@ import {
   Button,
   TextField,
 } from '@mui/material';
+import { auth } from './firebaseConfig';
 
 const formatPhoneDisplay = (value) => {
   if (!value.startsWith('+90')) {
@@ -118,7 +119,7 @@ const OperatorEkle = () => {
 
   useEffect(() => {
     const fetchOperators = async () => {
-      const operatorsCollection = collection(db, 'operatorListesi');
+      const operatorsCollection = collection(db, `users/${auth.currentUser?.email}/operators`);
       const operatorSnapshot = await getDocs(operatorsCollection);
       const operatorList = operatorSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setOperators(operatorList);
@@ -137,7 +138,7 @@ const OperatorEkle = () => {
     };
 
     try {
-      const docRef = await addDoc(collection(db, 'operatorListesi'), newOperator);
+      const docRef = await addDoc(collection(db, `users/${auth.currentUser?.email}/operators`), newOperator);
       setOperators([...operators, { id: docRef.id, ...newOperator }]);
       
       setName('');

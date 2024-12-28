@@ -25,8 +25,10 @@ import {
   where,
   writeBatch,
   deleteDoc,
-  updateDoc
+  updateDoc,
+  increment
 } from 'firebase/firestore';
+import { auth } from './firebaseConfig';
 
 import AddSantiyeModal from './AddSantiyeModal';
 import EditSantiyeModal from './EditSantiyeModal';
@@ -88,6 +90,7 @@ const EditCustomerModal = ({
   const [isAddAsSantiyeModalOpen, setIsAddAsSantiyeModalOpen] = useState(false);
   const [allCustomers, setAllCustomers] = useState([]);
   const [isWarningModalOpen, setIsWarningModalOpen] = useState(false);
+  const [selectedParentCustomer, setSelectedParentCustomer] = useState(null);
 
   // Eski müşteri verilerini tutan state
   const [oldCustomerData, setOldCustomerData] = useState(null);
@@ -105,17 +108,32 @@ const EditCustomerModal = ({
       setEditEmail(selectedCustomer['E-posta'] || '');
       setEditCariCode(selectedCustomer['cariCode'] || '');
 
-      const shantiyeler = approvedCustomers.filter(
-        (cust) => cust.parentId === selectedCustomer.id
+      const db = getFirestore();
+      const santiyeQuery = query(
+        collection(db, `users/${auth.currentUser?.email}/customerList`),
+        where('parentId', '==', selectedCustomer.id)
       );
-      setCustomerShantiyeler(shantiyeler);
+
+      getDocs(santiyeQuery)
+        .then((snapshot) => {
+          const santiyeler = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          setCustomerShantiyeler(santiyeler);
+        })
+        .catch((error) => {
+          console.error('Şantiyeler getirilirken hata:', error);
+          setError('Şantiyeler getirilirken bir hata oluştu.');
+          setAlertOpen(true);
+        });
     }
-  }, [selectedCustomer, approvedCustomers]);
+  }, [selectedCustomer, setError, setAlertOpen]);
 
   useEffect(() => {
     const fetchAllCustomers = async () => {
       const db = getFirestore();
-      const customersRef = collection(db, 'müşteri listesi');
+      const customersRef = collection(db, `users/${auth.currentUser?.email}/customerList`);
       const customersSnapshot = await getDocs(customersRef);
       const customersData = customersSnapshot.docs.map(doc => ({
         id: doc.id,
@@ -125,6 +143,35 @@ const EditCustomerModal = ({
     };
 
     fetchAllCustomers();
+  }, []);
+
+  useEffect(() => {
+    const fetchApprovedCustomers = async () => {
+      const db = getFirestore();
+      const customersRef = collection(db, `users/${auth.currentUser?.email}/customerList`);
+      const q = query(
+        customersRef,
+        where('Onay', '==', 'Onaylandı')
+      );
+
+      try {
+        const snapshot = await getDocs(q);
+        const approvedData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          'Müşteri Adı': doc.data()['Müşteri Adı'] || '',
+          'Onay': doc.data()['Onay'] || '',
+          'cariCode': doc.data()['cariCode'] || '',
+          'Şantiye': doc.data()['Şantiye'] || false,
+          'parentId': doc.data().parentId || null,
+        }));
+        setAllCustomers(approvedData);
+        console.log('Onaylanmış müşteriler:', approvedData);
+      } catch (error) {
+        console.error('Müşteriler getirilirken hata:', error);
+      }
+    };
+
+    fetchApprovedCustomers();
   }, []);
 
   const handleCloseModal = () => {
@@ -158,7 +205,7 @@ const EditCustomerModal = ({
     const db = getFirestore();
 
     try {
-      const customerListRef = collection(db, 'müşteri listesi');
+      const customerListRef = collection(db, `users/${auth.currentUser?.email}/customerList`);
       const nameConflictQuery = query(
         customerListRef,
         where('Müşteri Adı', '==', editName.trim()),
@@ -193,40 +240,42 @@ const EditCustomerModal = ({
     }
   };
 
-  const proceedWithUpdate = () => {
+  const proceedWithUpdate = async () => {
     const changes = [];
+    const db = getFirestore();
+    const batch = writeBatch(db);
 
-    if ((editName || '').trim() !== (selectedCustomer['Müşteri Adı'] || '').trim()) {
-      changes.push({
-        field: 'Müşteri Adı',
-        old: selectedCustomer['Müşteri Adı'] || '',
-        new: (editName || '').trim(),
-      });
-    }
-    if ((editPhone || '').trim() !== (selectedCustomer['Telefon'] || '').trim()) {
-      changes.push({
-        field: 'Telefon',
-        old: selectedCustomer['Telefon'] || '',
-        new: (editPhone || '').trim(),
-      });
-    }
-    if ((editEmail || '').trim() !== (selectedCustomer['E-posta'] || '').trim()) {
-      changes.push({
-        field: 'E-posta',
-        old: selectedCustomer['E-posta'] || '',
-        new: (editEmail || '').trim(),
-      });
-    }
-    if ((editCariCode || '').trim() !== (selectedCustomer.cariCode || '').trim()) {
-      changes.push({
-        field: 'Cari Kodu',
-        old: selectedCustomer.cariCode || '',
-        new: (editCariCode || '').trim(),
-      });
-    }
+    // Müşteri bilgilerini güncelle
+    const customerRef = doc(db, `users/${auth.currentUser?.email}/customerList`, selectedCustomer.id);
+    batch.update(customerRef, {
+      'Müşteri Adı': editName,
+      'Telefon': editPhone,
+      'E-posta': editEmail,
+      'cariCode': editCariCode,
+      'updatedAt': new Date().toISOString()
+    });
 
-    setUpdateChanges(changes);
-    setIsConfirmUpdateOpen(true);
+    // İlgili puantajları güncelle
+    const puantajlarRef = collection(db, 'puantajlar');
+    const puantajQuery = query(
+      puantajlarRef,
+      where('Müşteri Adı', '==', selectedCustomer['Müşteri Adı'])
+    );
+    
+    const puantajSnapshot = await getDocs(puantajQuery);
+    puantajSnapshot.forEach((puantajDoc) => {
+      batch.update(puantajDoc.ref, {
+        'Müşteri Adı': editName,
+        'Cari Kodu': editCariCode
+      });
+    });
+
+    // Tüm güncellemeleri tek seferde gerçekleştir
+    await batch.commit();
+
+    setSuccessMessage('Müşteri ve ilgili puantaj verileri başarıyla güncellendi.');
+    setAlertOpen(true);
+    onClose();
   };
 
   const confirmUpdate = async () => {
@@ -241,7 +290,7 @@ const EditCustomerModal = ({
         : normalizeString(selectedCustomer['Müşteri Adı']);
 
       // Ana müşteriyi güncelle
-      const customerRef = doc(db, 'müşteri listesi', selectedCustomer.id);
+      const customerRef = doc(db, `users/${auth.currentUser?.email}/customerList`, selectedCustomer.id);
       batch.update(customerRef, {
         'Müşteri Adı': editName.trim(),
         Telefon: editPhone.trim(),
@@ -268,7 +317,7 @@ const EditCustomerModal = ({
       // Şantiyeleri güncelle (eğer ana müşteriyse)
       if (selectedCustomer.cariCode !== editCariCode.trim()) {
         const santiyeQuery = query(
-          collection(db, 'müşteri listesi'),
+          collection(db, `users/${auth.currentUser?.email}/customerList`),
           where('parentId', '==', selectedCustomer.id)
         );
         const santiyeSnapshot = await getDocs(santiyeQuery);
@@ -328,7 +377,7 @@ const EditCustomerModal = ({
       }
 
       // Çakışan müşteriyi sil
-      await deleteDoc(doc(db, 'müşteri listesi', conflictingCustomer.id));
+      await deleteDoc(doc(db, `users/${auth.currentUser?.email}/customerList`, conflictingCustomer.id));
       console.log(`Çakışan müşteri silindi: ${conflictingCustomer['Müşteri Adı']}`);
 
       // Güncellemeye devam et
@@ -370,25 +419,27 @@ const EditCustomerModal = ({
     setIsCustomerSelectionOpen(false);
   };
 
-  const handleAddAsSantiye = async (parentCustomer) => {
-    setIsAddAsSantiyeModalOpen(false);
+  const handleCustomerSelect = (customer) => {
+    setSelectedParentCustomer(customer);
+  };
 
-    if (!selectedCustomer || !parentCustomer) {
-      setError('Müşteri bilgileri eksik.');
+  const handleAddAsSantiye = async () => {
+    if (!editName.trim() || !selectedParentCustomer) {
+      setError('Lütfen şantiye adını girin ve ana müşteriyi seçin.');
       setAlertOpen(true);
       return;
     }
 
     const db = getFirestore();
     try {
-      // Ana müşterinin mevcut şantiyelerini getir ve cari kodlarını analiz et
+      // Ana müşterinin mevcut şantiyelerini getir
       const shantiyeQuery = query(
-        collection(db, 'müşteri listesi'),
-        where('parentId', '==', parentCustomer.id)
+        collection(db, `users/${auth.currentUser?.email}/customerList`),
+        where('parentId', '==', selectedParentCustomer.id)
       );
       const shantiyeSnapshot = await getDocs(shantiyeQuery);
 
-      // Mevcut şantiye numaralarını topla
+      // Yeni şantiye numarası hesapla
       const existingNumbers = shantiyeSnapshot.docs
         .map(doc => {
           const cariCode = doc.data()['Şantiye Cari Kodu'] || '';
@@ -397,11 +448,8 @@ const EditCustomerModal = ({
         })
         .filter(num => !isNaN(num));
 
-      // Boşluk kontrolü yap
       let nextNumber = 1;
-      existingNumbers.sort((a, b) => a - b); // Sırala
-
-      // Sıralı numaralarda ilk boşluğu bul
+      existingNumbers.sort((a, b) => a - b);
       for (let i = 0; i < existingNumbers.length; i++) {
         if (existingNumbers[i] !== i + 1) {
           nextNumber = i + 1;
@@ -410,39 +458,33 @@ const EditCustomerModal = ({
         nextNumber = i + 2;
       }
 
-      // Yeni cari kodu oluştur
-      const newCariCode = `${parentCustomer.cariCode}/${nextNumber}`;
-      const customerName = selectedCustomer['Müşteri Adı'] || '';
+      const newCariCode = `${selectedParentCustomer.cariCode}/${nextNumber}`;
 
-      console.log('Mevcut şantiye numaraları:', existingNumbers);
-      console.log('Yeni şantiye kodu:', newCariCode);
-
-      // Mevcut onay bekleyen müşteriyi şantiye olarak güncelle
-      await updateDoc(doc(db, 'müşteri listesi', selectedCustomer.id), {
-        Onay: 'Onaylandı',
-        Şantiye: true,
-        parentId: parentCustomer.id,
-        '��antiye Adı': customerName,
+      // Şantiye olarak güncelle
+      await updateDoc(doc(db, `users/${auth.currentUser?.email}/customerList`, selectedCustomer.id), {
+        'Şantiye Adı': editName.trim(),
+        'Müşteri Adı': editName.trim(),
+        'Şantiye': true,
+        'parentId': selectedParentCustomer.id,
         'Şantiye Cari Kodu': newCariCode,
-        cariCode: newCariCode,
-        updatedAt: new Date().toISOString()
+        'cariCode': newCariCode,
+        'Onay': 'Onaylandı',
+        'updatedAt': new Date().toISOString()
       });
 
       // Ana müşterinin şantiye sayısını güncelle
-      await updateDoc(doc(db, 'müşteri listesi', parentCustomer.id), {
-        santiyeCount: existingNumbers.length + 1,
+      await updateDoc(doc(db, `users/${auth.currentUser?.email}/customerList`, selectedParentCustomer.id), {
+        santiyeCount: increment(1),
         updatedAt: new Date().toISOString()
       });
 
-      // Şantiye olarak eklendiyse, aynı isimdeki diğer verileri sil
-      await removeDuplicateCustomers(db, customerName, selectedCustomer.id);
-
-      setSuccessMessage('Müşteri başarıyla şantiye olarak dönüştürüldü.');
+      setSuccessMessage('Müşteri başarıyla şantiye olarak eklendi.');
       setAlertOpen(true);
+      setIsAddAsSantiyeModalOpen(false);
       onClose();
     } catch (error) {
-      console.error('Şantiye olarak dönüştürülürken hata oluştu:', error);
-      setError(`Şantiye olarak dönüştürülürken hata oluştu: ${error.message}`);
+      console.error('Şantiye eklenirken hata:', error);
+      setError('Şantiye eklenirken bir hata oluştu.');
       setAlertOpen(true);
     }
   };
@@ -450,7 +492,7 @@ const EditCustomerModal = ({
   // Aynı isimdeki diğer kayıtları silen yardımcı fonksiyon
   async function removeDuplicateCustomers(db, customerName, excludeId) {
     try {
-      const customerListRef = collection(db, 'müşteri listesi');
+      const customerListRef = collection(db, `users/${auth.currentUser?.email}/customerList`);
       const q = query(customerListRef, where('Müşteri Adı', '==', customerName));
       const querySnapshot = await getDocs(q);
   
@@ -458,7 +500,7 @@ const EditCustomerModal = ({
       for (const docSnap of querySnapshot.docs) {
         if (docSnap.id !== excludeId) {
           console.log(`Siliniyor (aynı isimli diğer kayıt): ${docSnap.id}, Adı: ${customerName}`);
-          await deleteDoc(doc(db, 'müşteri listesi', docSnap.id));
+          await deleteDoc(doc(db, `users/${auth.currentUser?.email}/customerList`, docSnap.id));
         }
       }
     } catch (err) {
@@ -482,6 +524,57 @@ const EditCustomerModal = ({
     setIsWarningModalOpen(false);
     await checkConflictsAndUpdate();
   };
+
+  // AddAsSantiye modal içeriği
+  const AddAsSantiyeContent = () => (
+    <>
+      <Typography variant="h6" gutterBottom>
+        Şantiye Olarak Ekle
+      </Typography>
+
+      <TextField
+        label="Şantiye Adı"
+        fullWidth
+        margin="normal"
+        value={editName}
+        onChange={(e) => setEditName(e.target.value)}
+      />
+
+      <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>
+        Ana Müşteriyi Seçin:
+      </Typography>
+
+      <Box sx={{ maxHeight: '400px', overflow: 'auto', mt: 1 }}>
+        <CustomerSelectionTable
+          customers={allCustomers.filter(customer => 
+            customer['Onay'] === 'Onaylandı' && !customer['Şantiye']
+          )}
+          onSelectCustomer={handleCustomerSelect}
+          selectedId={selectedParentCustomer?.id}
+        />
+      </Box>
+
+      {selectedParentCustomer && (
+        <Typography variant="body2" sx={{ mt: 2, mb: 2 }}>
+          Seçilen Müşteri: {selectedParentCustomer['Müşteri Adı']}
+        </Typography>
+      )}
+
+      <Box mt={2} display="flex" justifyContent="flex-end" gap={2}>
+        <Button variant="outlined" onClick={() => setIsAddAsSantiyeModalOpen(false)}>
+          İptal
+        </Button>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleAddAsSantiye}
+          disabled={!editName.trim() || !selectedParentCustomer}
+        >
+          Şantiye Olarak Ekle
+        </Button>
+      </Box>
+    </>
+  );
 
   return (
     <>
@@ -660,17 +753,7 @@ const EditCustomerModal = ({
 
       <Modal open={isAddAsSantiyeModalOpen} onClose={() => setIsAddAsSantiyeModalOpen(false)}>
         <ModalBox>
-          <Typography variant="h6" gutterBottom>
-            Şantiye Olarak Ekle
-          </Typography>
-          <Typography variant="body1" gutterBottom>
-            Lütfen bu müşteriyi şantiye olarak eklemek istediğiniz ana müşteriyi seçin:
-          </Typography>
-          <CustomerSelectionTable
-            customers={allCustomers.filter(c => c.Onay === 'Onaylandı' && !c.parentId)}
-            onSelectCustomer={(customer) => handleAddAsSantiye(customer)}
-            includeSpecialCases={true}
-          />
+          <AddAsSantiyeContent />
         </ModalBox>
       </Modal>
 

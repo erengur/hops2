@@ -22,6 +22,7 @@ import {
 import CustomerSelectionTable from './CustomerSelectionTable';
 import ConflictResolutionModal from './ConflictResolutionModal';
 import ConfirmUpdateModal from './ConfirmUpdateModal';
+import { auth } from './firebaseConfig';
 
 const ModalBox = styled(Box)(({ theme }) => ({
   position: 'absolute',
@@ -72,10 +73,18 @@ const EditSantiyeModal = ({
 
   useEffect(() => {
     if (selectedSantiye) {
-      setEditSantiyeName(selectedSantiye['Şantiye Adı'] || '');
+      setEditSantiyeName(selectedSantiye['Şantiye Adı'] || selectedSantiye['Müşteri Adı'] || '');
       setEditSantiyePhone(selectedSantiye['Telefon'] || '');
       setEditSantiyeEmail(selectedSantiye['E-posta'] || '');
-      setEditSantiyeCariCode(selectedSantiye['Şantiye Cari Kodu'] || '');
+      setEditSantiyeCariCode(selectedSantiye['Şantiye Cari Kodu'] || selectedSantiye.cariCode || '');
+      
+      console.log('Seçilen şantiye verileri:', {
+        santiyeAdi: selectedSantiye['Şantiye Adı'],
+        musteriAdi: selectedSantiye['Müşteri Adı'],
+        telefon: selectedSantiye['Telefon'],
+        email: selectedSantiye['E-posta'],
+        cariKod: selectedSantiye['Şantiye Cari Kodu'] || selectedSantiye.cariCode
+      });
     }
   }, [selectedSantiye]);
 
@@ -87,51 +96,49 @@ const EditSantiyeModal = ({
     }
 
     const db = getFirestore();
-
     try {
-      const santiyeListRef = collection(db, 'müşteri listesi');
-      const nameConflictQuery = query(
-        santiyeListRef,
-        where('Şantiye Adı', '==', normalizeString(editSantiyeName)),
-        where('__name__', '!=', selectedSantiye.id)
+      const batch = writeBatch(db);
+
+      // Şantiyeyi güncelle
+      const santiyeRef = doc(db, 'müşteri listesi', selectedSantiye.id);
+      const updateData = {
+        'Şantiye Adı': editSantiyeName.trim(),
+        'Müşteri Adı': editSantiyeName.trim(), // Müşteri adını da güncelle
+        'Telefon': editSantiyePhone.trim(),
+        'E-posta': editSantiyeEmail.trim(),
+        'Şantiye Cari Kodu': editSantiyeCariCode.trim(),
+        'cariCode': editSantiyeCariCode.trim(), // Normal cariCode'u da güncelle
+        'updatedAt': new Date().toISOString()
+      };
+      batch.update(santiyeRef, updateData);
+
+      // İlgili puantajları güncelle
+      const puantajlarRef = collection(db, 'puantajlar');
+      const puantajQuery = query(
+        puantajlarRef,
+        where('Müşteri Adı', 'in', [
+          selectedSantiye['Şantiye Adı'],
+          selectedSantiye['Müşteri Adı']
+        ])
       );
-      const cariCodeConflictQuery = query(
-        santiyeListRef,
-        where('Şantiye Cari Kodu', '==', normalizeString(editSantiyeCariCode)),
-        where('__name__', '!=', selectedSantiye.id)
-      );
 
-      const [nameConflictSnapshot, cariCodeConflictSnapshot] = await Promise.all([
-        getDocs(nameConflictQuery),
-        getDocs(cariCodeConflictQuery),
-      ]);
-
-      if (!nameConflictSnapshot.empty || !cariCodeConflictSnapshot.empty) {
-        const conflictingDoc = !nameConflictSnapshot.empty
-          ? nameConflictSnapshot.docs[0]
-          : cariCodeConflictSnapshot.docs[0];
-
-        // Çakışan şantiyenin puantaj verilerini kontrol et
-        const puantajlarRef = collection(db, 'puantajlar');
-        const puantajQuery = query(
-          puantajlarRef,
-          where('Müşteri Adı', '==', conflictingDoc.data()['Şantiye Adı'])
-        );
-        const puantajSnapshot = await getDocs(puantajQuery);
-
-        setConflictingSantiye({
-          ...conflictingDoc.data(),
-          id: conflictingDoc.id,
-          puantajCount: puantajSnapshot.size // Puantaj sayısını ekle
+      const puantajSnapshot = await getDocs(puantajQuery);
+      puantajSnapshot.forEach((puantajDoc) => {
+        batch.update(puantajDoc.ref, {
+          'Müşteri Adı': editSantiyeName.trim(),
+          'Cari Kodu': editSantiyeCariCode.trim()
         });
-        setIsConflictModalOpen(true);
-        return;
-      }
+      });
 
-      proceedWithUpdate();
+      // Tüm güncellemeleri tek seferde gerçekleştir
+      await batch.commit();
+
+      setSuccessMessage('Şantiye ve ilgili puantaj verileri başarıyla güncellendi.');
+      setAlertOpen(true);
+      onClose();
     } catch (error) {
-      console.error('Şantiye güncellenirken bir hata oluştu:', error);
-      setError(`Şantiye güncellenirken bir hata oluştu: ${error.message}`);
+      console.error('Şantiye güncellenirken hata:', error);
+      setError('Şantiye güncellenirken bir hata oluştu.');
       setAlertOpen(true);
     }
   };
@@ -313,9 +320,10 @@ const EditSantiyeModal = ({
       <Modal open={isOpen} onClose={onClose}>
         <ModalBox>
           <Typography variant="h6" gutterBottom>
-            ��antiye Düzenle
+            Şantiye Düzenle
           </Typography>
-          <Box display="flex" alignItems="center">
+          
+          <Box display="flex" alignItems="center" mb={2}>
             <TextField
               label="Şantiye Adı"
               fullWidth
